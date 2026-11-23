@@ -1,0 +1,1390 @@
+<!DOCTYPE html>
+<html lang="de">
+
+<head>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+    <title>Tiefsee-Zocker</title>
+
+    <style>
+    :root {
+        --fg:#eaf6ff;
+        --ac:#ffc83d;
+        box-sizing:border-box;
+        padding-top:env(safe-area-inset-top,0px);
+        padding-bottom:env(safe-area-inset-bottom,0px);
+    }
+
+    html,body {
+        height:100%;
+        margin:0;
+        overflow:hidden;
+        background:#0b1b2b;
+        color:var(--fg);
+        font:15px system-ui,sans-serif;
+        touch-action:none;
+        user-select:none;
+        -webkit-user-select:none;
+    }
+
+    #c {
+        position:fixed;
+        inset:0;
+        width:100%;
+        height:100%;
+    }
+
+    #hud {
+        position:fixed;
+        left:8px;
+        right:8px;
+        top:calc(env(safe-area-inset-top,0px) + 8px);
+        display:flex;
+        gap:8px;
+        flex-wrap:wrap;
+        pointer-events:none;
+    }
+
+    .pill {
+        background:#000a;
+        padding:6px 10px;
+        border-radius:14px;
+        font-weight:600;
+    }
+
+    #o2 {
+        width:100%;
+        height:8px;
+        background:#0008;
+        border-radius:4px;
+        overflow:hidden;
+    }
+
+    #o2b {
+        height:100%;
+        background:#4df;
+        width:100%;
+    }
+
+    button {
+        font:inherit;
+        color:#fff;
+        background:#1d6fa5;
+        border:0;
+        border-radius:12px;
+        padding:10px 14px;
+    }
+
+    .b {
+        background:var(--ac);
+        color:#222;
+        font-weight:700;
+    }
+
+    #bar {
+        position:fixed;
+        left:0;
+        right:0;
+        bottom:calc(env(safe-area-inset-bottom,0px) + 10px);
+        display:flex;
+        justify-content:center;
+        gap:8px;
+    }
+
+    .side {
+        position:fixed;
+        right:12px;
+        bottom:calc(env(safe-area-inset-bottom,0px) + 70px);
+        display:flex;
+        flex-direction:column;
+        gap:10px;
+    }
+
+    .side button {
+        width:64px;
+        height:64px;
+        font-size:26px;
+        border-radius:50%;
+        background:#0b4f7ccc;
+    }
+
+    #joy {
+        display:none;
+        position:fixed;
+        width:100px;
+        height:100px;
+        border-radius:50%;
+        background:#fff3;
+        border:2px solid #fff6;
+        pointer-events:none;
+    }
+
+    #nub {
+        position:absolute;
+        left:30px;
+        top:30px;
+        width:40px;
+        height:40px;
+        border-radius:50%;
+        background:#fffa;
+    }
+
+    #m {
+        display:none;
+        position:fixed;
+        inset:0;
+        background:#000b;
+        align-items:center;
+        justify-content:center;
+        padding:12px;
+        touch-action:pan-y;
+    }
+
+    #mp {
+        background:#10283d;
+        border-radius:18px;
+        padding:16px;
+        width:100%;
+        max-width:440px;
+        max-height:86%;
+        overflow:auto;
+    }
+
+    .r {
+        display:flex;
+        justify-content:space-between;
+        align-items:center;
+        gap:8px;
+        padding:8px 0;
+        border-bottom:1px solid #fff2;
+    }
+
+    .g {
+        display:flex;
+        gap:6px;
+        flex-wrap:wrap;
+        margin:6px 0;
+    }
+
+    .g button {
+        flex:1;
+    }
+
+    .red {
+        background:#c0392b!important;
+        color:#fff!important;
+    }
+
+    .blk {
+        background:#222!important;
+        color:#fff!important;
+    }
+
+    .grn {
+        background:#1e8e4e!important;
+        color:#fff!important;
+    }
+
+    #rn {
+        font-size:54px;
+        font-weight:800;
+        text-align:center;
+        margin:6px 0;
+    }
+
+    #t {
+        position:fixed;
+        left:50%;
+        top:22%;
+        transform:translateX(-50%);
+        background:#000c;
+        padding:8px 14px;
+        border-radius:12px;
+        display:none;
+        pointer-events:none;
+        text-align:center;
+    }
+
+    h3,h4 {
+        margin:4px 0 8px;
+    }
+
+    input { -webkit-user-select:text; user-select:text; font:inherit; }
+
+    small {
+        opacity:.7;
+    }
+    </style>
+</head>
+
+<body>
+    <!-- 3D-Zeichenfläche -->
+    <canvas id="c"></canvas>
+
+    <!-- HUD: Geld, Chips, Tiefe, Luftbalken -->
+    <div id="hud">
+        <span class="pill">💵 $<span id="hm"></span></span>
+        <span class="pill">🪙 <span id="hc"></span></span>
+        <span class="pill">⬇ <span id="hd"></span></span>
+        <div id="o2"><div id="o2b"></div></div>
+    </div>
+
+    <!-- Hilfe- und Vollbild-Button -->
+    <button id="hp" onclick="openM('help')"
+        style="position:fixed;right:58px;top:calc(env(safe-area-inset-top,0px) + 8px);padding:6px 12px;background:#000a">❓</button>
+    <button id="ad" onclick="openM('adm')"
+        style="position:fixed;right:108px;top:calc(env(safe-area-inset-top,0px) + 8px);padding:6px 12px;background:#000a">🔧</button>
+    <button id="cu" onclick="openM('cust')"
+        style="position:fixed;right:152px;top:calc(env(safe-area-inset-top,0px) + 8px);padding:6px 12px;background:#000a">🎨</button>
+    <button id="fs"
+        style="position:fixed;right:8px;top:calc(env(safe-area-inset-top,0px) + 8px);padding:6px 12px;background:#000a">⛶</button>
+
+    <!-- Touch-Joystick -->
+    <div id="joy"><div id="nub"></div></div>
+
+    <!-- Auf-/Abtauchen -->
+    <div class="side">
+        <button id="bup">⬆</button>
+        <button id="bdn">⬇</button>
+    </div>
+
+    <!-- Untere Leiste (Casino/Angeln/Schatzsuche erscheinen nur an den Häusern) -->
+    <div id="bar">
+        <button onclick="openM('shop')">🛠 Shop</button>
+        <button onclick="openM('mk')">📈 Markt</button>
+        <button class="b" id="bcas" style="display:none" onclick="openM('cas')">🎰 Casino</button>
+        <button class="b" id="bfi" style="display:none" onclick="openM('fish')">🎣 Angeln</button>
+        <button class="b" id="bsc" style="display:none" onclick="openM('tr')">⛏ Schatzsuche</button>
+        <button class="b" id="bpo" style="display:none" onclick="openM('portal')">🌀 Portal</button>
+        <button class="b" id="bg1" style="display:none" onclick="openM('g1')"></button>
+        <button class="b" id="bg2" style="display:none" onclick="openM('g2')"></button>
+    </div>
+
+    <!-- Toast-Meldung -->
+    <div id="t"></div>
+
+    <!-- Menü-Overlay -->
+    <div id="m">
+        <div id="mp">
+            <div id="mb"></div>
+            <div class="g"><button onclick="closeM()">Schließen</button></div>
+        </div>
+    </div>
+
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"></script>
+    <script>
+
+    // ============================================================
+    // 1. HELFER & SPIELSTAND
+    // ============================================================
+    const $ = i => document.getElementById(i);
+    const fmt = n => Math.floor(n).toLocaleString('de-DE');
+    const WM = [1, 10, 100];
+    const TC = [[0xb66dff,0x3fa9ff,0x3dff9a,0xffd23d,0xff4d4d],[0xff8a3d,0xff4de1,0x4dfff0,0xffffff,0x8aff4d],[0x00ffd0,0xff00aa,0xfff700,0x7a5cff,0xffffff]];
+    let TH = { uw: 0x0b4f7c, sky: 0x9ad8f5 };
+    let S = {
+        money: 0, chips: 0, u: [0, 0, 0, 0, 0], coin: 0, bot: null, fish: {}, seen: {}, q: 0, buff: 0, w: 0, unl: [1, 0, 0], k: [0, 0], nm: '', cs: { b: 0xff7a1a, h: 0xffd2a6, t: 0x888888, hat: 0 }
+    };
+    try {
+        Object.assign(S, JSON.parse(localStorage.getItem('tz1') || '{}'));
+    } catch (e) { }
+    const save = () => {
+        if (window.noSave) return;
+        try {
+            localStorage.setItem('tz1', JSON.stringify(S));
+        } catch (e) { }
+    };
+
+    // ============================================================
+    // 2. UPGRADES (Shop-Daten & Formeln)
+    // ============================================================
+    const UN = ['Sauerstofftank', 'Drucktauchanzug', 'Flossen', 'Chip-Magnet', 'Trading-Algorithmus'];
+    const UD = ['+12 s Luft', '+8 m maximale Tiefe', 'schneller schwimmen', 'größerer Sammelradius', 'bessere Bot-Rendite'];
+    const UB = [80, 120, 70, 90, 150];
+    const MAXL = 6;
+    const cost = i => Math.round(UB[i] * Math.pow(2.1, S.u[i]));
+    const lim = () => 8 + 8 * S.u[1];
+    const o2max = () => (25 + 12 * S.u[0]) * (S.buff > Date.now() ? 1.5 : 1);
+    let tt;
+    function toast(s) {
+        const t = $('t');
+        t.textContent = s;
+        t.style.display = 'block';
+        clearTimeout(tt);
+        tt = setTimeout(() => t.style.display = 'none', 2200);
+    }
+
+    // ============================================================
+    // 3. 3D-SZENE (Renderer, Kamera, Licht, Becken)
+    // ============================================================
+    const cv = $('c');
+    const R = new THREE.WebGLRenderer({ canvas: cv, antialias: true });
+    R.setPixelRatio(Math.min(devicePixelRatio, 2));
+    const sc = new THREE.Scene();
+    sc.background = new THREE.Color(0x9ad8f5);
+    sc.fog = new THREE.FogExp2(0x9ad8f5, 0.004);
+    const cm = new THREE.PerspectiveCamera(60, 1, .1, 300);
+    function rs() {
+        R.setSize(innerWidth, innerHeight, false);
+        cm.aspect = innerWidth / innerHeight;
+        cm.updateProjectionMatrix();
+    }
+    addEventListener('resize', rs);
+    rs();
+    sc.add(new THREE.AmbientLight(0xffffff, .8));
+    const dl = new THREE.DirectionalLight(0xffffff, .6);
+    dl.position.set(10, 30, 10);
+    sc.add(dl);
+    const M = (c, o) => new THREE.MeshStandardMaterial(Object.assign({ color: c }, o || {}));
+    function box(w, h, d, x, y, z, c) {
+        const m = new THREE.Mesh(new THREE.BoxGeometry(w, h, d), M(c));
+        m.position.set(x, y, z);
+        sc.add(m);
+        return m;
+    }
+    [[0, -18.5, 60, 23], [0, 18.5, 60, 23], [-18.5, 0, 23, 14], [18.5, 0, 23, 14]].forEach(a => box(a[2], .4, a[3], a[0], -.2, a[1], 0xd9cfae));
+    const walls = new THREE.Mesh(new THREE.BoxGeometry(14, 60, 14), M(0x2a8fbd, { side: THREE.BackSide }));
+    walls.position.y = -30;
+    sc.add(walls);
+    const fl = new THREE.Mesh(new THREE.PlaneGeometry(14, 14), M(0x1b5a80));
+    fl.rotation.x = -Math.PI / 2;
+    fl.position.y = -59.9;
+    sc.add(fl);
+    const wt = new THREE.Mesh(new THREE.PlaneGeometry(14, 14), new THREE.MeshBasicMaterial({
+        color: 0x2aa3d8, transparent: true, opacity: .5, side: THREE.DoubleSide
+    }));
+    wt.rotation.x = -Math.PI / 2;
+    wt.position.y = -.05;
+    sc.add(wt);
+    for (let d = 8; d <= 56; d += 8) {
+        const l = new THREE.LineLoop(new THREE.BufferGeometry().setFromPoints([[-6.9, 0, -6.9], [6.9, 0, -6.9], [6.9, 0, 6.9], [-6.9, 0, 6.9]].map(a => new THREE.Vector3(a[0], -d, a[2]))), new THREE.LineBasicMaterial({ color: 0xffffff }));
+        sc.add(l);
+    }
+    const bar = new THREE.Mesh(new THREE.PlaneGeometry(14, 14), new THREE.MeshBasicMaterial({
+        color: 0xff2222, transparent: true, opacity: .3, side: THREE.DoubleSide
+    }));
+    bar.rotation.x = -Math.PI / 2;
+    sc.add(bar);
+    const setBar = () => bar.position.y = -lim() - .5;
+    setBar();
+    // Casino
+
+    // ============================================================
+    // 4a. GEBÄUDE: Casino
+    // ============================================================
+    box(16, 9, 8, 0, 4.5, -24, 0x6a1b3a);
+    box(3, 5, .3, 0, 2.5, -19.9, 0xffc83d);
+    {
+        const k = document.createElement('canvas');
+        k.width = 256;
+        k.height = 64;
+        const x = k.getContext('2d');
+        x.fillStyle = '#111';
+        x.fillRect(0, 0, 256, 64);
+        x.fillStyle = '#ffc83d';
+        x.font = 'bold 44px sans-serif';
+        x.textAlign = 'center';
+        x.fillText('CASINO', 128, 48);
+        const s = new THREE.Mesh(new THREE.PlaneGeometry(8, 2), new THREE.MeshBasicMaterial({ map: new THREE.CanvasTexture(k) }));
+        s.position.set(0, 7.2, -19.9);
+        sc.add(s);
+    }
+    // Angelhaus
+
+    // ============================================================
+    // 4b. GEBÄUDE: Angelhaus
+    // ============================================================
+    box(7, 4.5, 5, 25, 2.25, -8, 0x8b5a2b);
+    box(8, .5, 6, 25, 4.75, -8, 0x5a3a1a);
+    box(.3, 3, 1.8, 21.4, 1.5, -8, 0x3b2412);
+    {
+        const pd = new THREE.Mesh(new THREE.CircleGeometry(4, 24), new THREE.MeshBasicMaterial({ color: 0x2aa3d8 }));
+        pd.rotation.x = -Math.PI / 2;
+        pd.position.set(24, .03, 6);
+        sc.add(pd);
+        const k = document.createElement('canvas');
+        k.width = 256;
+        k.height = 64;
+        const x = k.getContext('2d');
+        x.fillStyle = '#3b2412';
+        x.fillRect(0, 0, 256, 64);
+        x.fillStyle = '#fff';
+        x.font = 'bold 40px sans-serif';
+        x.textAlign = 'center';
+        x.fillText('🎣 ANGELN', 128, 46);
+        const s = new THREE.Mesh(new THREE.PlaneGeometry(4, 1), new THREE.MeshBasicMaterial({ map: new THREE.CanvasTexture(k) }));
+        s.rotation.y = -Math.PI / 2;
+        s.position.set(21.3, 3.8, -8);
+        sc.add(s);
+    }
+    // Schatzhütte
+
+    // ============================================================
+    // 4c. GEBÄUDE: Schatzhütte
+    // ============================================================
+    box(7, 4.5, 5, -25, 2.25, -8, 0x6b6b3a);
+    box(8, .5, 6, -25, 4.75, -8, 0x3d3d1e);
+    box(.3, 3, 1.8, -21.4, 1.5, -8, 0x3b2412);
+    {
+        const k = document.createElement('canvas');
+        k.width = 256;
+        k.height = 64;
+        const x = k.getContext('2d');
+        x.fillStyle = '#3d3d1e';
+        x.fillRect(0, 0, 256, 64);
+        x.fillStyle = '#ffe28a';
+        x.font = 'bold 34px sans-serif';
+        x.textAlign = 'center';
+        x.fillText('⛏ SCHATZSUCHE', 128, 44);
+        const s = new THREE.Mesh(new THREE.PlaneGeometry(4.6, 1.15), new THREE.MeshBasicMaterial({ map: new THREE.CanvasTexture(k) }));
+        s.rotation.y = Math.PI / 2;
+        s.position.set(-21.3, 3.8, -8);
+        sc.add(s);
+    }
+    // Player
+
+    // ============================================================
+    // 5. SPIELER
+    // ============================================================
+    const pg = new THREE.Group();
+    let pgB, pgH, pgT;
+    {
+        const b = pgB = new THREE.Mesh(new THREE.CylinderGeometry(.35, .35, 1, 12), M(0xff7a1a));
+        const h = pgH = new THREE.Mesh(new THREE.SphereGeometry(.3, 12, 12), M(0xffd2a6));
+        h.position.y = .7;
+        const t = pgT = new THREE.Mesh(new THREE.CylinderGeometry(.18, .18, .8, 10), M(0x888888));
+        t.position.set(0, .1, -.4);
+        pg.add(b, h, t);
+        sc.add(pg);
+    }
+    const p = {
+        x: 0, y: 0, z: 10, o2: o2max()
+    };
+
+    // ============================================================
+    // 6. CHIPS (Sammelobjekte im Becken)
+    // ============================================================
+    const chips = [];
+    const GEM = new THREE.OctahedronGeometry(.45);
+    const CH = new THREE.CylinderGeometry(.35, .35, .08, 16);
+    function place(c, b) {
+        const r = c.userData.rare, mx = Math.min(59, lim() + 6), lo = Math.max(6, lim() * .5), d = Math.min(59, r ? lo + Math.random() * (mx - lo) : b != null ? b * 8 + 1 + Math.random() * 7 : 1 + Math.random() * mx);
+        let x, z, n = 0;
+        do {
+            x = (Math.random() - .5) * 12;
+            z = (Math.random() - .5) * 12;
+        } while (n++ < 9 && Math.hypot(x - p.x, z - p.z) < 2.5 && Math.abs(d + p.y) < 3);
+        c.position.set(x, -d, z);
+        const t = Math.min(4, Math.floor(d / 12));
+        c.userData.v = (r ? (15 + Math.floor(d * 1.5)) * (1 + t * t) : 1 + Math.floor(d / 4)) * WM[S.w];
+        c.userData.tier = t;
+        if (r) {
+            c.material.color.setHex(TC[S.w][t]);
+            c.material.emissive.setHex(TC[S.w][t]);
+            c.scale.setScalar(.8 + .2 * t);
+        }
+        c.visible = true;
+        if (!r) {
+            c.material.color.setHSL(.15 - d / 60 * .15 + (d > 40 ? .75 : 0), .9, .55);
+            c.material.emissive.copy(c.material.color).multiplyScalar(.35);
+        }
+    }
+    for (let i = 0; i < 90; i++) {
+        const r = i >= 80, c = new THREE.Mesh(r ? GEM : CH, r ? M(0xb66dff, {
+            emissive: 0x8a2be2, emissiveIntensity: .9, metalness: .6, roughness: .2
+        }) : M(0xffffff));
+        c.userData.rare = r;
+        if (!r)
+            c.rotation.x = Math.PI / 2;
+        chips.push(c);
+        place(c);
+        sc.add(c);
+    }
+
+    // ============================================================
+    // 7. EINGABE (Touch, Maus, Tastatur, Vollbild)
+    // ============================================================
+    let yaw = 0;
+    let pitch = .5;
+    let joy = null;
+    let drag = null;
+    let jv = { x: 0, y: 0 };
+    let up = 0;
+    let dn = 0;
+    let K = {};
+    cv.addEventListener('pointerdown', e => {
+        if (view)
+            return;
+        if (e.pointerType != 'mouse' && e.clientX < innerWidth * .45 && e.clientY > innerHeight * .4 && !joy) {
+            joy = { id: e.pointerId, x: e.clientX, y: e.clientY };
+            $('joy').style.cssText = `display:block;left:${e.clientX - 50}px;top:${e.clientY - 50}px`;
+        }
+        else if (!drag)
+            drag = { id: e.pointerId, x: e.clientX, y: e.clientY };
+        cv.setPointerCapture(e.pointerId);
+    });
+    cv.addEventListener('pointermove', e => {
+        if (joy && e.pointerId == joy.id) {
+            let dx = e.clientX - joy.x, dy = e.clientY - joy.y, l = Math.hypot(dx, dy), m = 45;
+            if (l > m) {
+                dx *= m / l;
+                dy *= m / l;
+            }
+            jv = { x: dx / m, y: dy / m };
+            $('nub').style.transform = `translate(${dx}px,${dy}px)`;
+        }
+        else if (drag && e.pointerId == drag.id) {
+            yaw -= (e.clientX - drag.x) * .006;
+            pitch = Math.min(1.3, Math.max(.1, pitch + (e.clientY - drag.y) * .004));
+            drag.x = e.clientX;
+            drag.y = e.clientY;
+        }
+    });
+    const pu = e => {
+        if (joy && e.pointerId == joy.id) {
+            joy = null;
+            jv = { x: 0, y: 0 };
+            $('joy').style.display = 'none';
+            $('nub').style.transform = '';
+        }
+        if (drag && e.pointerId == drag.id)
+            drag = null;
+    };
+    cv.addEventListener('pointerup', pu);
+    cv.addEventListener('pointercancel', pu);
+    [['bup', v => up = v], ['bdn', v => dn = v]].forEach(([i, f]) => {
+        const b = $(i);
+        b.addEventListener('pointerdown', e => {
+            e.preventDefault();
+            f(1);
+        });
+        ['pointerup', 'pointerleave', 'pointercancel'].forEach(n => b.addEventListener(n, () => f(0)));
+    });
+    addEventListener('keydown', e => {
+        const k = e.key.toLowerCase();
+        K[k] = 1;
+        if (['arrowup', 'arrowdown', ' '].includes(k))
+            e.preventDefault();
+        if (k == 'escape')
+            closeM();
+        else if (!view) {
+            if (k == 'e')
+                interact();
+            if (k == 'm')
+                openM('mk');
+            if (k == 'b')
+                openM('shop');
+            if (k == 'h')
+                openM('help');
+        }
+    });
+    addEventListener('keyup', e => K[e.key.toLowerCase()] = 0);
+    $('fs').onclick = () => {
+        const d = document, e = d.documentElement;
+        try {
+            if (d.fullscreenElement || d.webkitFullscreenElement) {
+                (d.exitFullscreen || d.webkitExitFullscreen).call(d);
+            }
+            else {
+                const f = e.requestFullscreen || e.webkitRequestFullscreen;
+                if (!f)
+                    return toast('Vollbild: Seite im Browsermenü zum Home-Bildschirm hinzufügen');
+                const r = f.call(e);
+                if (r && r.catch)
+                    r.catch(() => toast('Vollbild hier nicht erlaubt – Link direkt im Browser öffnen'));
+            }
+        } catch (x) {
+            toast('Vollbild nicht möglich');
+        }
+    };
+    let camD = 9;
+    addEventListener('wheel', e => {
+        camD = Math.max(4, Math.min(16, camD + e.deltaY * .01));
+    }, { passive: true });
+
+    // ============================================================
+    // 8. HAUPTSCHLEIFE (Bewegung, Luft, Chips, Kamera, HUD)
+    // ============================================================
+    let last = performance.now();
+    let tu = 0;
+    function loop(now) {
+        requestAnimationFrame(loop);
+        const dt = Math.min(.05, (now - last) / 1000);
+        last = now;
+        let jx = jv.x + (K.d || K.arrowright ? 1 : 0) - (K.a || K.arrowleft ? 1 : 0), jy = jv.y + (K.s || K.arrowdown ? 1 : 0) - (K.w || K.arrowup ? 1 : 0);
+        const inP = Math.abs(p.x) < 7 && Math.abs(p.z) < 7, sy = Math.sin(yaw), cy = Math.cos(yaw);
+        let mx = cy * jx + sy * jy, mz = -sy * jx + cy * jy;
+        const l = Math.hypot(mx, mz);
+        if (l > 1) {
+            mx /= l;
+            mz /= l;
+        }
+        const sp = (inP ? 3.5 : 5) + .5 * S.u[2];
+        if (!view) {
+            p.x += mx * sp * dt;
+            p.z += mz * sp * dt;
+        }
+        if (l > .1)
+            pg.rotation.y = Math.atan2(mx, mz);
+        if (inP && !view) {
+            const v = (up || K[' '] ? 1 : 0) - (dn || K.shift || K.c ? 1 : 0);
+            // Realistisches Sinken: ohne Eingabe sinkt man langsam, mit Eingabe wird weich beschleunigt/gebremst
+            const tv = v ? v * (2.5 + .3 * S.u[2]) : -1.3;
+            p.vy = (p.vy || 0) + (tv - (p.vy || 0)) * Math.min(1, dt * (v ? 5 : 1.5));
+            p.y = Math.min(0, Math.max(-lim(), p.y + p.vy * dt));
+            if (p.y <= -lim() || p.y >= 0) p.vy = 0;
+        }
+        else if (!inP) {
+            p.y = 0;
+            p.vy = 0;
+        }
+        if (p.y < -.8) {
+            p.x = Math.max(-6.5, Math.min(6.5, p.x));
+            p.z = Math.max(-6.5, Math.min(6.5, p.z));
+        }
+        p.x = Math.max(-28, Math.min(28, p.x));
+        p.z = Math.max(-28, Math.min(28, p.z));
+        if (p.y < -.6)
+            p.o2 -= dt;
+        else
+            p.o2 = Math.min(o2max(), p.o2 + dt * 8);
+        if (p.o2 <= 0) {
+            const lost = Math.floor(S.chips / 2);
+            S.chips -= lost;
+            p.o2 = o2max();
+            p.x = 0;
+            p.z = 10;
+            p.y = 0;
+            toast('Luft aus! Du verlierst ' + lost + ' Chips');
+            save();
+        }
+        pg.position.set(p.x, p.y + (inP ? .3 : .9), p.z);
+        tu -= dt;
+        if (tu <= 0) {
+            tu = 1;
+            const mb = Math.floor(Math.min(59, lim() + 6) / 8);
+            for (let b = 0; b <= mb; b++) {
+                if (chips.filter(c => !c.userData.rare && c.visible && -c.position.y >= b * 8 && -c.position.y < b * 8 + 8).length < 7) {
+                    const h = chips.find(c => !c.userData.rare && (!c.visible || -c.position.y > lim() + 8));
+                    if (h)
+                        place(h, b);
+                }
+            }
+        }
+        const rad = 1.3 + .5 * S.u[3];
+        for (const c of chips) {
+            c.rotation.z += dt * 2;
+            if (!c.visible) {
+                c.userData.t -= dt;
+                if (c.userData.t <= 0)
+                    place(c);
+                continue;
+            }
+            if (c.position.distanceTo(pg.position) < rad) {
+                S.chips += c.userData.v;
+                c.visible = false;
+                const ra = c.userData.rare;
+                c.userData.t = ra ? (25 + Math.random() * 25) * (1 + c.userData.tier * .6) : 2 + Math.random() * 2;
+                if (ra)
+                    toast('💎 Seltener Chip! +' + c.userData.v);
+            }
+        }
+        cm.position.set(p.x + sy * Math.cos(pitch) * camD, p.y + 1 + Math.sin(pitch) * camD, p.z + cy * Math.cos(pitch) * camD);
+        if (p.y < -.8) {
+            cm.position.x = Math.max(-6.8, Math.min(6.8, cm.position.x));
+            cm.position.z = Math.max(-6.8, Math.min(6.8, cm.position.z));
+            cm.position.y = Math.max(-59.5, cm.position.y);
+        }
+        cm.lookAt(p.x, p.y + .5, p.z);
+        const uw = cm.position.y < 0 && Math.abs(cm.position.x) < 7 && Math.abs(cm.position.z) < 7;
+        sc.background.set(uw ? TH.uw : TH.sky);
+        sc.fog.color.set(uw ? TH.uw : TH.sky);
+        sc.fog.density = uw ? .05 : .004;
+        const nc = Math.hypot(p.x, p.z + 19) < 5;
+        $('bcas').style.display = nc ? '' : 'none';
+        if (!nc && view == 'cas')
+            closeM();
+        const nf = Math.hypot(p.x - 19.5, p.z + 8) < 5;
+        $('bfi').style.display = nf ? '' : 'none';
+        if (!nf && view == 'fish')
+            closeM();
+        const ns = Math.hypot(p.x + 19.5, p.z + 8) < 5;
+        $('bsc').style.display = ns ? '' : 'none';
+        if (!ns && view == 'tr')
+            closeM();
+        $('hm').textContent = fmt(S.money);
+        $('hc').textContent = fmt(S.chips);
+        $('hd').textContent = Math.max(0, -p.y).toFixed(0) + '/' + lim() + ' m';
+        $('o2b').style.width = (100 * p.o2 / o2max()) + '%';
+        R.render(sc, cm);
+    }
+    requestAnimationFrame(loop);
+
+    // ============================================================
+    // 9. MENÜ-SYSTEM (Shop, Roulette, Casino-Hilfen)
+    // ============================================================
+    let view = null;
+    let bet = 1;
+    let spinning = false;
+    let hist = [];
+    const RED = new Set([1, 3, 5, 7, 9, 12, 14, 16, 18, 19, 21, 23, 25, 27, 30, 32, 34, 36]);
+    function openM(v) {
+        view = v;
+        lastKey = '';
+        $('m').style.display = 'flex';
+        render();
+    }
+    function closeM() {
+        clearTimeout(ft);
+        fst = 'idle';
+        fmsg = '';
+        view = null;
+        $('m').style.display = 'none';
+    }
+    function render() {
+        const b = $('mb');
+        if (view == 'cust') cuR();
+        if (view == 'portal') portalR();
+        if (view == 'g1' || view == 'g2') gR();
+        if (view == 'adm') admR();
+        if (view == 'tr')
+            treasR();
+        if (view == 'help')
+            b.innerHTML = HELP;
+        if (view == 'fish')
+            fishR();
+        setTimeout(bjR);
+        if (view == 'shop')
+            b.innerHTML = '<h3>🛠 Tauch-Shop</h3><small>Tiefe: ' + lim() + ' m (rote Ebene im Becken)</small>' + S.u.map((l, i) => `<div class="r"><div><b>${UN[i]}</b> ${l}/${MAXL}<br><small>${UD[i]}</small></div><button class="b" onclick="buyU(${i})">${l >= MAXL ? 'MAX' : '$' + fmt(cost(i))}</button></div>`).join('');
+        if (view == 'cas')
+            b.innerHTML = casTop() + (cg == 'bj' ? bjH() : `<div id="rn">–</div><div id="rm" style="text-align:center">Wähle eine Farbe</div><p>Einsatz: <b id="bt">${bet}</b> Chips</p><div class="g"><button onclick="bs(0)">Min</button><button onclick="bs(1)">½</button><button onclick="bs(2)">×2</button><button onclick="bs(3)">Max</button></div><div class="g"><button class="red" onclick="spin('r')">Rot ×2</button><button class="blk" onclick="spin('k')">Schwarz ×2</button><button class="grn" onclick="spin('g')">0 ×36</button></div><small id="hs">${hist.join(' ')}</small>`);
+        if (view == 'mk') {
+            b.innerHTML = '<h3>📈 Markt: COIN-X</h3><canvas id="ch" width="400" height="140" style="width:100%;background:#0006;border-radius:8px"></canvas><p>Kurs $<b id="pr"></b> · Bestand <b id="hd2"></b> (≈$<span id="hv"></span>) · Geld $<span id="mo"></span></p><div class="g"><button onclick="tr(100)">Kaufe $100</button><button onclick="tr(1000)">Kaufe $1000</button><button onclick="tr(-1)">Alles kaufen</button><button onclick="tr(0)">Alles verkaufen</button></div><hr><h4>🤖 Trading-Bot (10 Min)</h4><div id="bot"></div>';
+            updM();
+        }
+    }
+    function buyU(i) {
+        if (S.u[i] >= MAXL)
+            return;
+        if (S.money < cost(i))
+            return toast('Zu wenig Geld');
+        S.money -= cost(i);
+        S.u[i]++;
+        setBar();
+        save();
+        render();
+    }
+    function sell() {
+        S.money += S.chips * 3;
+        S.chips = 0;
+        save();
+        upC();
+    }
+    function upC() {
+        if ($('cc')) {
+            $('cc').textContent = fmt(S.chips);
+            $('cmn').textContent = fmt(S.money);
+        }
+    }
+    function bs(k) {
+        bet = [1, Math.ceil(bet / 2), bet * 2, S.chips][k];
+        bet = Math.max(1, Math.min(bet, Math.max(1, S.chips)));
+        $('bt').textContent = fmt(bet);
+    }
+    function spin(t) {
+        if (spinning)
+            return;
+        if (bet < 1 || bet > S.chips)
+            return toast('Nicht genug Chips');
+        S.chips -= bet;
+        spinning = true;
+        upC();
+        let i = 0;
+        (function step() {
+            const r = Math.floor(Math.random() * 37), col = r == 0 ? 'g' : RED.has(r) ? 'r' : 'k';
+            i++;
+            const e = $('rn');
+            if (e) {
+                e.textContent = r;
+                e.style.color = col == 'r' ? '#ff5a4a' : col == 'g' ? '#3ddc84' : '#fff';
+            }
+            if (i < 26)
+                return setTimeout(step, 40 + i * 5);
+            spinning = false;
+            const w = col == t;
+            if (w)
+                S.chips += bet * (t == 'g' ? 36 : 2);
+            hist.unshift((col == 'r' ? '🔴' : col == 'g' ? '🟢' : '⚫') + r);
+            hist = hist.slice(0, 8);
+            if ($('rm'))
+                $('rm').textContent = w ? 'Gewonnen! +' + bet * ((t == 'g' ? 36 : 2) - 1) + ' Chips' : 'Verloren −' + bet + ' Chips';
+            if ($('hs'))
+                $('hs').textContent = hist.join(' ');
+            bet = Math.max(1, Math.min(bet, S.chips));
+            upC();
+            save();
+        })();
+    }
+
+    // ============================================================
+    // 10. CASINO: Blackjack
+    // ============================================================
+    let cg = 'rou';
+    let bj = null;
+    const casTop = () => `<div class="g"><button class="${cg == 'rou' ? 'b' : ''}" onclick="cg='rou';render()">Roulette</button><button class="${cg == 'bj' ? 'b' : ''}" onclick="cg='bj';render()">Blackjack</button></div><p>🪙 <b id="cc">${fmt(S.chips)}</b> · 💵 $<b id="cmn">${fmt(S.money)}</b></p><div class="g"><button class="b" onclick="sell()">Alle verkaufen ($3/Chip)</button></div><small>Chips kaufen ($5 pro Chip):</small><div class="g"><button onclick="buyC(1)">1</button><button onclick="buyC(5)">5</button><button onclick="buyC(10)">10</button><button onclick="buyC(15)">15</button></div>`;
+    const bjH = () => `<div id="bjt"></div><p>Einsatz: <b id="bt">${bet}</b> Chips</p><div class="g"><button onclick="bs(0)">Min</button><button onclick="bs(1)">½</button><button onclick="bs(2)">×2</button><button onclick="bs(3)">Max</button></div><div class="g"><button class="b" onclick="bjDeal()">Austeilen</button><button onclick="bjHit()">Karte</button><button onclick="bjStand()">Halten</button><button onclick="bjDbl()">Double</button></div><small>Blackjack zahlt 3:2</small>`;
+    function buyC(n) {
+        if (S.money < n * 5)
+            return toast('Zu wenig Geld ($' + n * 5 + ' nötig)');
+        S.money -= n * 5;
+        S.chips += n;
+        save();
+        upC();
+    }
+    const rk = ['A', '2', '3', '4', '5', '6', '7', '8', '9', '10', 'J', 'Q', 'K'];
+    const su = ['♠', '♥', '♦', '♣'];
+    const dc = () => ({ r: Math.floor(Math.random() * 13), s: su[Math.floor(Math.random() * 4)] });
+    const cs = c => rk[c.r] + c.s;
+    function hv(h) {
+        let t = 0, a = 0;
+        for (const c of h) {
+            t += c.r == 0 ? 11 : Math.min(10, c.r + 1);
+            if (c.r == 0)
+                a++;
+        }
+        while (t > 21 && a > 0) {
+            t -= 10;
+            a--;
+        }
+        return t;
+    }
+    function bjDeal() {
+        if (bj && !bj.over)
+            return;
+        if (bet < 1 || bet > S.chips)
+            return toast('Nicht genug Chips');
+        S.chips -= bet;
+        bj = {
+            p: [dc(), dc()], d: [dc(), dc()], bet, over: false, msg: ''
+        };
+        if (hv(bj.p) == 21)
+            bjEnd(true);
+        upC();
+        bjR();
+    }
+    function bjHit() {
+        if (!bj || bj.over)
+            return;
+        bj.p.push(dc());
+        if (hv(bj.p) > 21)
+            bjEnd();
+        bjR();
+    }
+    function bjStand() {
+        if (!bj || bj.over)
+            return;
+        bjEnd();
+        bjR();
+    }
+    function bjDbl() {
+        if (!bj || bj.over || bj.p.length != 2 || S.chips < bj.bet)
+            return toast('Double nicht möglich');
+        S.chips -= bj.bet;
+        bj.bet *= 2;
+        bj.p.push(dc());
+        bjEnd();
+        bjR();
+        upC();
+    }
+    function bjEnd(nat) {
+        bj.over = true;
+        const p = hv(bj.p);
+        let pay = 0;
+        if (p > 21)
+            bj.msg = 'Bust! −' + bj.bet;
+        else {
+            if (!nat)
+                while (hv(bj.d) < 17)
+                    bj.d.push(dc());
+            const d = hv(bj.d);
+            if (nat && d != 21) {
+                pay = Math.floor(bj.bet * 2.5);
+                bj.msg = 'Blackjack! +' + (pay - bj.bet);
+            }
+            else if (d > 21 || p > d) {
+                pay = bj.bet * 2;
+                bj.msg = 'Gewonnen! +' + bj.bet;
+            }
+            else if (p == d) {
+                pay = bj.bet;
+                bj.msg = 'Unentschieden';
+            }
+            else
+                bj.msg = 'Verloren −' + bj.bet;
+        }
+        S.chips += pay;
+        save();
+        upC();
+    }
+    function bjR() {
+        const e = $('bjt');
+        if (!e)
+            return;
+        if (!bj) {
+            e.innerHTML = '<p>Setze Chips und tippe auf Austeilen.</p>';
+            return;
+        }
+        e.innerHTML = `<p>Dealer: <b>${bj.over ? bj.d.map(cs).join(' ') + ' (' + hv(bj.d) + ')' : cs(bj.d[0]) + ' 🂠'}</b></p><p>Du: <b>${bj.p.map(cs).join(' ')} (${hv(bj.p)})</b></p><p style="font-size:18px"><b>${bj.msg}</b></p>`;
+    }
+
+    // ============================================================
+    // 11. HILFE & INTERAKTION
+    // ============================================================
+    const HELP = '<h3>❓ Steuerung</h3><b>📱 Handy</b><br>Linker Daumen (unten links): Joystick zum Laufen und Schwimmen<br>Rechts wischen: Kamera drehen<br>⬆ / ⬇: auftauchen / abtauchen<br>Unten erscheinen Buttons: Shop, Markt und an den Häusern Casino, Angeln, Schatzsuche<br><br><b>💻 Computer</b><br>W A S D / Pfeiltasten: laufen und schwimmen<br>Maus ziehen: Kamera drehen · Mausrad: Zoom<br>Leertaste: auftauchen · Shift: abtauchen<br>E: Haus betreten · B: Shop · M: Markt · H: Hilfe · Esc: schließen<br>⛶: Vollbild<br><br><b>Ziel</b><br>Sammle Chips (💎 sind selten), verkaufe oder verzocke sie im Casino und kaufe Upgrades. Achte auf deine Luft!<br>';
+    function interact() {
+        if (view)
+            return;
+        for (const [i, v] of [['bcas', 'cas'], ['bfi', 'fish'], ['bsc', 'tr'], ['bpo', 'portal'], ['bg1', 'g1'], ['bg2', 'g2']])
+            if ($(i).style.display == '')
+                return openM(v);
+    }
+
+    // ============================================================
+    // 12. SCHATZSUCHE
+    // ============================================================
+    let tg = null;
+    function tNew() {
+        if (tg && !tg.done)
+            return;
+        if (S.money < 10)
+            return toast('Ticket kostet $10');
+        S.money -= 10;
+        tg = {
+            x: Math.floor(Math.random() * 6), y: Math.floor(Math.random() * 6), dug: {}, n: 5, done: false, msg: 'Grabe los!'
+        };
+        save();
+        treasR();
+    }
+    function tDig(i) {
+        if (!tg || tg.done || tg.dug[i] != null)
+            return;
+        const x = i % 6, y = Math.floor(i / 6), d = Math.max(Math.abs(x - tg.x), Math.abs(y - tg.y));
+        tg.n--;
+        if (d == 0) {
+            const c = 200;
+            S.chips += c;
+            tg.dug[i] = '💰';
+            tg.done = true;
+            tg.msg = 'Schatz gefunden! +' + c + ' Chips 💎';
+        }
+        else {
+            tg.dug[i] = d == 1 ? '🔥' : d == 2 ? '🌡' : '❄';
+            tg.msg = d == 1 ? 'Heiß! Ganz nah!' : d == 2 ? 'Warm …' : 'Kalt …';
+            if (tg.n <= 0) {
+                tg.done = true;
+                tg.dug[tg.y * 6 + tg.x] = '✖';
+                tg.msg = 'Kein Schatz gefunden. Er lag beim ✖';
+            }
+        }
+        save();
+        treasR();
+    }
+    function treasR() {
+        if (view != 'tr')
+            return;
+        $('mb').innerHTML = `<h3>⛏ Schatzsucher</h3><p>${tg ? tg.msg + ' <b>Versuche: ' + tg.n + '</b>' : 'Im Sand liegt ein Schatz vergraben. Ticket $10, 5 Spatenstiche. Hinweise: 🔥 nah, 🌡 mittel, ❄ weit. Beute: 200 Chips.'}</p><div style="display:grid;grid-template-columns:repeat(6,1fr);gap:4px">${Array.from({ length: 36 }, (_, i) => `<button style="padding:12px 0;font-size:20px;background:${tg && tg.dug[i] != null ? '#5a4a2a' : '#c9a96a'}" onclick="tDig(${i})">${tg && tg.dug[i] || '&nbsp;'}</button>`).join('')}</div><div class="g"><button class="b" onclick="tNew()">Neues Ticket ($10)</button></div>`;
+    }
+
+    // ============================================================
+    // 13. ANGELN (Fische, Sammelbuch, Quests)
+    // ============================================================
+    const FISH = [['Sardine', '🐟', 60, 4, 1200], ['Forelle', '🐠', 25, 10, 950], ['Karpfen', '🐡', 10, 25, 750], ['Hecht', '🦈', 4, 60, 580], ['Goldener Koi', '🎏', .9, 200, 420], ['Tiefsee-Krake', '🐙', .1, 1000, 350]];
+    const QS = [['Sardine', 5, 40], ['Forelle', 3, 80], ['Karpfen', 2, 150], ['Hecht', 1, 250], ['Goldener Koi', 1, 600]];
+    let fst = 'idle';
+    let ft;
+    let fcur;
+    let fmsg = '';
+    function fAct() {
+        if (fst == 'idle') {
+            fst = 'wait';
+            fmsg = 'Köder im Wasser … warte auf den Biss';
+            fishR();
+            ft = setTimeout(() => {
+                let r = Math.random() * 100;
+                fcur = FISH.find(f => (r -= f[2]) < 0) || FISH[0];
+                fst = 'bite';
+                fmsg = '❗ BISS!';
+                fishR();
+                ft = setTimeout(() => {
+                    if (fst == 'bite') {
+                        fst = 'idle';
+                        fmsg = 'Entwischt …';
+                        fishR();
+                    }
+                }, fcur[4]);
+            }, 1500 + Math.random() * 3500);
+        }
+        else if (fst == 'wait') {
+            clearTimeout(ft);
+            fst = 'idle';
+            fmsg = 'Zu früh gezogen!';
+            fishR();
+        }
+        else {
+            clearTimeout(ft);
+            fst = 'idle';
+            S.fish[fcur[0]] = (S.fish[fcur[0]] || 0) + 1;
+            S.seen[fcur[0]] = 1;
+            if (S.w == 0 && !S.unl[1] && !S.k[0] && Math.random() < 1 / 25) {
+                S.k[0] = 1;
+                toast('🔑 Schlüssel gefunden! Bring ihn zum Portal');
+            }
+            fmsg = 'Gefangen: ' + fcur[1] + ' ' + fcur[0] + '!';
+            save();
+            fishR();
+        }
+    }
+    function fSell() {
+        let t = 0;
+        for (const f of FISH) {
+            t += (S.fish[f[0]] || 0) * f[3];
+            S.fish[f[0]] = 0;
+        }
+        if (!t)
+            return toast('Keine Fische');
+        S.money += t;
+        toast('+$' + fmt(t));
+        save();
+        fishR();
+    }
+    function fCook() {
+        const f = FISH.find(f => S.fish[f[0]] > 0);
+        if (!f)
+            return toast('Keine Fische');
+        S.fish[f[0]]--;
+        S.buff = Date.now() + 180000;
+        p.o2 = o2max();
+        toast('Mahlzeit! +50% Luft für 3 Minuten');
+        save();
+        fishR();
+    }
+    function fQ() {
+        const q = QS[S.q];
+        if (!q || (S.fish[q[0]] || 0) < q[1])
+            return toast('Dir fehlen Fische');
+        S.fish[q[0]] -= q[1];
+        S.money += q[2];
+        S.q++;
+        toast('Quest erledigt! +$' + q[2]);
+        save();
+        fishR();
+    }
+    function fishR() {
+        if (view != 'fish')
+            return;
+        const q = QS[S.q];
+        $('mb').innerHTML = `<h3>🎣 Angelhaus</h3><div style="text-align:center;font-size:20px;min-height:56px;margin:6px 0">${fmsg || 'Wirf die Angel aus und zieh, sobald es anbeißt!'}</div><div class="g"><button class="b" style="font-size:20px;padding:18px" onclick="fAct()">${fst == 'idle' ? 'Angel auswerfen' : fst == 'wait' ? 'Warten …' : 'JETZT ZIEHEN!'}</button></div><h4>📖 Sammelbuch</h4>${FISH.map(f => `<div class="r"><span>${S.seen[f[0]] ? f[1] + ' ' + f[0] : '❓ ???'}</span><small>${f[2] < 1 ? 'legendär' : f[2] < 5 ? 'selten' : 'häufig'} · ${S.seen[f[0]] ? 'im Beutel: ' + (S.fish[f[0]] || 0) + ' · $' + f[3] : 'unentdeckt'}</small></div>`).join('')}<div class="g"><button onclick="fSell()">Alle verkaufen</button><button onclick="fCook()">Kochen (Buff)</button></div><h4>📜 Quest</h4>${q ? `<div class="r"><span>${q[1]}× ${q[0]} abgeben<br><small>Belohnung $${q[2]}</small></span><button class="b" onclick="fQ()">Abgeben</button></div>` : '<small>Alle Quests erledigt!</small>'}`;
+    }
+
+    // ============================================================
+    // 14. MARKT (COIN-X) & TRADING-BOT
+    // ============================================================
+    let price = 100;
+    let ph = [];
+    for (let i = 0; i < 80; i++) {
+        price = Math.max(20, Math.min(500, price * (1 + (Math.random() - .5) * .05)));
+        ph.push(price);
+    }
+    setInterval(() => {
+        if (!ADM.frz)
+            price = Math.max(20, Math.min(500, price * (1 + (Math.random() - .5) * .05 + (100 - price) * .0003)));
+        ph.push(price);
+        ph.shift();
+        if (view == 'mk')
+            updM();
+    }, 1000);
+    function tr(a) {
+        if (a == 0) {
+            S.money += S.coin * price;
+            S.coin = 0;
+        }
+        else {
+            if (a < 0)
+                a = S.money;
+            a = Math.min(a, S.money);
+            if (a < 1)
+                return toast('Zu wenig Geld');
+            S.money -= a;
+            S.coin += a / price;
+        }
+        save();
+        updM();
+    }
+    function startBot(a) {
+        a = Math.min(Math.floor(a), Math.floor(S.money));
+        if (a < 10)
+            return toast('Mindestens $10');
+        S.money -= a;
+        S.bot = { end: Date.now() + 600000, inv: a, res: a * (.82 + Math.random() * .5 + .04 * S.u[4]) };
+        save();
+        updM();
+    }
+    function collect() {
+        const g = S.bot.res - S.bot.inv;
+        S.money += S.bot.res;
+        toast((g >= 0 ? 'Bot-Gewinn +$' : 'Bot-Verlust −$') + fmt(Math.abs(g)));
+        S.bot = null;
+        save();
+        updM();
+    }
+    let lastKey = '';
+    function updM() {
+        if (!$('ch'))
+            return;
+        $('pr').textContent = price.toFixed(2);
+        $('hd2').textContent = S.coin.toFixed(2);
+        $('hv').textContent = fmt(S.coin * price);
+        $('mo').textContent = fmt(S.money);
+        const c = $('ch').getContext('2d'), mn = Math.min(...ph), mx = Math.max(...ph);
+        c.clearRect(0, 0, 400, 140);
+        c.beginPath();
+        ph.forEach((v, i) => c[i ? 'lineTo' : 'moveTo'](i * 400 / 79, 130 - (v - mn) / (mx - mn || 1) * 120));
+        c.strokeStyle = ph[79] >= ph[0] ? '#3ddc84' : '#ff5a4a';
+        c.lineWidth = 2;
+        c.stroke();
+        const left = S.bot ? S.bot.end - Date.now() : 0, key = !S.bot ? 'i' : left <= 0 ? 'd' : 'r', bd = $('bot');
+        if (key != lastKey) {
+            lastKey = key;
+            bd.innerHTML = key == 'i' ? '<small>Der Bot handelt 10 Minuten für dich (auch während du tauchst). Rendite schwankt, Verlust möglich.</small><div class="g"><button onclick="startBot(100)">$100</button><button onclick="startBot(1000)">$1000</button><button onclick="startBot(S.money*.5)">50%</button><button onclick="startBot(S.money)">Alles</button></div>' : key == 'd' ? '<p>Fertig! Ergebnis: <b>$' + fmt(S.bot.res) + '</b> (Einsatz $' + fmt(S.bot.inv) + ')</p><button class="b" onclick="collect()">Abholen</button>' : '<p>Bot arbeitet mit $' + fmt(S.bot.inv) + ' … <b id="cd"></b></p><div style="height:8px;background:#0006;border-radius:4px"><div id="pb" style="height:100%;background:#4df;border-radius:4px"></div></div>';
+        }
+        if (key == 'r') {
+            $('cd').textContent = Math.floor(left / 60000) + ':' + String(Math.floor(left / 1000) % 60).padStart(2, '0');
+            $('pb').style.width = (100 - left / 6000) + '%';
+        }
+    }
+    setInterval(() => {
+        if (view == 'mk')
+            updM();
+        save();
+    }, 1000);
+
+    // ============================================================
+    // 15. ERWEITERUNG: Welten, Portal, Minispiele, Adminpanel
+    // ============================================================
+    const ADMIN_PW = 'admin123'; // <- hier Passwort ändern
+    const ADM = { on: 0, frz: 0 };
+    addEventListener('keydown', e => { if (e.target.tagName == 'INPUT') e.stopImmediatePropagation(); }, true);
+    addEventListener('keyup', e => { if (e.target.tagName == 'INPUT') e.stopImmediatePropagation(); }, true);
+    const PORTAL_Y = -54;
+    const WN = ['Tiefsee', 'Kristallwelt', 'Magmawelt'];
+    const HOUSES = [[-14, 16, 'g1'], [14, 16, 'g2']];
+    const GN = [0, ['🎰 Slots', '⚡ Reaktion'], ['🔱 Plinko', '🃏 Memory']];
+    const G = [0, ['slots', 'react'], ['plinko', 'mem']];
+    const sg = t => {
+        const k = document.createElement('canvas');
+        k.width = 256; k.height = 64;
+        const x = k.getContext('2d');
+        x.fillStyle = '#222'; x.fillRect(0, 0, 256, 64);
+        x.fillStyle = '#fff'; x.font = 'bold 34px sans-serif'; x.textAlign = 'center';
+        x.fillText(t, 128, 44);
+        return new THREE.CanvasTexture(k);
+    };
+    const hs = HOUSES.map(([x, z], i) => {
+        const g = new THREE.Group();
+        g.position.set(x, 0, z);
+        const b = new THREE.Mesh(new THREE.BoxGeometry(6, 4, 6), M(i ? 0x2d8f5a : 0x8f2d6a));
+        b.position.y = 2;
+        const s = new THREE.Mesh(new THREE.PlaneGeometry(5, 1.25), new THREE.MeshBasicMaterial({ map: sg('?') }));
+        s.position.set(0, 4.8, 3.1);
+        g.add(b, s);
+        sc.add(g);
+        return { g, s };
+    });
+    const portal = new THREE.Mesh(new THREE.TorusGeometry(2.5, .4, 12, 32), new THREE.MeshBasicMaterial({ color: 0xffffff }));
+    portal.position.y = PORTAL_Y;
+    sc.add(portal);
+    function setW(n) {
+        S.w = n;
+        TH.uw = [0x0b4f7c, 0x4a1670, 0x6a1a1a][n];
+        TH.sky = [0x9ad8f5, 0xd9a6f5, 0xf5b08a][n];
+        walls.material.color.setHex([0x2a8fbd, 0x8a3fbd, 0xbd4a2a][n]);
+        fl.material.color.setHex([0x1b5a80, 0x4a2a80, 0x802a1a][n]);
+        wt.material.color.setHex([0x2aa3d8, 0xb06af0, 0xf08a3a][n]);
+        portal.material.color.setHex(TC[Math.min(2, n + 1)][3]);
+        hs.forEach((h, i) => { h.g.visible = n > 0; if (n) h.s.material.map = sg(GN[n][i]); });
+        Object.assign(p, { x: 0, y: 0, z: 0, o2: o2max() });
+        chips.forEach(c => place(c));
+        save();
+    }
+    const go = n => { closeM(); setW(n); toast('🌀 ' + WN[n]); };
+    function portalR() {
+        const n = S.w, nx = n + 1;
+        let h = '<h3>🌀 Portal</h3>';
+        if (n < 2)
+            h += S.unl[nx] ? `<div class="g"><button class="b" onclick="go(${nx})">→ ${WN[nx]} (Chips ×${WM[nx]})</button></div>`
+                : S.k[n] ? `<p>🔑 Du hast einen Schlüssel!</p><div class="g"><button class="b" onclick="S.k[${n}]=0;S.unl[${nx}]=1;save();render()">Portal öffnen</button></div>`
+                    : `<p>Das Portal ist versiegelt. Du brauchst einen 🔑 Schlüssel (${n ? 'Reaktion-Minispiel' : 'Angeln'}, Chance 1:25).</p>`;
+        else h += '<p>Das ist die letzte Welt.</p>';
+        if (n > 0) h += `<div class="g"><button onclick="go(${n - 1})">← ${WN[n - 1]}</button></div>`;
+        $('mb').innerHTML = h;
+    }
+    const _om = openM;
+    openM = function (v) { gst = 0; gt0++; _om(v); };
+    setInterval(() => {
+        const np = Math.hypot(p.x, p.y - PORTAL_Y, p.z) < 4;
+        $('bpo').style.display = np ? '' : 'none';
+        if (!np && view == 'portal') closeM();
+        HOUSES.forEach(([x, z, id]) => {
+            const near = S.w > 0 && Math.hypot(p.x - x, p.z - z) < 5;
+            $('b' + id).style.display = near ? '' : 'none';
+            if (!near && view == id) closeM();
+        });
+        $('bg1').textContent = GN[S.w] ? GN[S.w][0] : '';
+        $('bg2').textContent = GN[S.w] ? GN[S.w][1] : '';
+    }, 150);
+
+    // ---- Minispiele ----
+    let gm = '', gb = 0, gst = 0, gt0 = 0, mem = null;
+    const gk = () => G[S.w][view == 'g1' ? 0 : 1];
+    const bt = () => `<p>Einsatz: <b id="bt">${bet}</b> Chips · 🪙 <b>${fmt(S.chips)}</b></p><div class="g"><button onclick="bs(0)">Min</button><button onclick="bs(1)">½</button><button onclick="bs(2)">×2</button><button onclick="bs(3)">Max</button></div>`;
+    const pay = m => { S.chips += Math.floor(gb * m); save(); };
+    const take = () => { if (bet < 1 || bet > S.chips) { toast('Nicht genug Chips'); return 0; } S.chips -= bet; gb = bet; return 1; };
+    function gR() {
+        const k = gk();
+        let h = `<h3>${GN[S.w][view == 'g1' ? 0 : 1]}</h3><div style="text-align:center;font-size:30px;min-height:48px;margin:6px 0">${gm}</div>`;
+        if (k == 'slots') h += bt() + '<div class="g"><button class="b" onclick="slots()">Drehen</button></div><small>3 gleiche ×20 · 2 gleiche = Einsatz zurück</small>';
+        if (k == 'react') h += bt() + `<div class="g"><button class="${gst == 2 ? 'grn' : 'b'}" style="padding:22px" onclick="react()">${['Start', 'Warte …', 'JETZT!'][gst]}</button></div><small>Schneller = mehr Gewinn (bis ×3) · 🔑 Schlüssel 1:25 pro Runde</small>`;
+        if (k == 'plinko') h += bt() + '<div class="g"><button class="b" onclick="plinko()">Kugel fallen lassen</button></div><small>Multiplikatoren außen ×9 ·· Mitte ×0,4</small>';
+        if (k == 'mem') h += bt() + (mem ? '<div style="display:grid;grid-template-columns:repeat(4,1fr);gap:6px">' + mem.c.map((v, i) => `<button style="font-size:24px;padding:12px 0" onclick="flip(${i})">${mem.o[i] || mem.d[i] ? v : '❔'}</button>`).join('') + '</div><p>Fehler: ' + mem.m + '/4</p>' : '') + '<div class="g"><button class="b" onclick="memNew()">Neues Spiel</button></div><small>Alle 6 Paare mit max. 4 Fehlern: ×3</small>';
+        $('mb').innerHTML = h;
+    }
+    function slots() {
+        if (!take()) return;
+        const sy = ['🍒', '🍋', '🔔', '⭐', '💎', '7️⃣'], r = [0, 0, 0].map(() => sy[Math.random() * 6 | 0]), e = new Set(r).size;
+        pay(e == 1 ? 20 : e == 2 ? 1 : 0);
+        gm = r.join(' ') + '<br><small>' + (e == 1 ? 'JACKPOT ×20!' : e == 2 ? 'Einsatz zurück' : 'Verloren') + '</small>';
+        gR();
+    }
+    function react() {
+        if (gst == 0) {
+            if (!take()) return;
+            gst = 1; gm = '…'; gR();
+            const id = ++gt0;
+            setTimeout(() => { if (gt0 == id && view == 'g2') { gst = 2; gt0 = performance.now(); gR(); } }, 1000 + Math.random() * 2500);
+        } else if (gst == 1) { gt0++; gst = 0; gm = 'Zu früh! ❌'; gR(); }
+        else {
+            const t = performance.now() - gt0, m = t < 350 ? 3 : t < 550 ? 2 : t < 800 ? 1.2 : 0;
+            pay(m); gst = 0;
+            gm = Math.round(t) + ' ms → ' + (m ? '×' + m : 'Verloren');
+            if (S.w == 1 && !S.unl[2] && !S.k[1] && Math.random() < 1 / 25) { S.k[1] = 1; toast('🔑 Schlüssel für ' + WN[2] + '!'); save(); }
+            gR();
+        }
+    }
+    function plinko() {
+        if (!take()) return;
+        let n = 0, a = '';
+        for (let i = 0; i < 8; i++) { const r = Math.random() < .5; n += r; a += r ? '↘' : '↙'; }
+        const m = [9, 4, 1.4, .6, .4, .6, 1.4, 4, 9][n];
+        pay(m); gm = a + '<br><b>×' + m + '</b>'; gR();
+    }
+    function memNew() {
+        if (!take()) return;
+        const e = ['🐙', '🦈', '🐠', '🐡', '🦀', '🐚'];
+        mem = { c: [...e, ...e].sort(() => Math.random() - .5), o: [], d: [], m: 0, end: 0 };
+        gm = ''; gR();
+    }
+    function flip(i) {
+        if (!mem || mem.end || mem.d[i] || mem.o[i] || mem.o.filter(x => x).length > 1) return;
+        mem.o[i] = 1; gR();
+        const o = mem.o.map((x, j) => x ? j : -1).filter(j => j >= 0);
+        if (o.length < 2) return;
+        const [a, b] = o;
+        if (mem.c[a] == mem.c[b]) {
+            mem.d[a] = mem.d[b] = 1; mem.o = [];
+            if (mem.d.filter(x => x).length == 12) { pay(3); gm = 'Gewonnen ×3! 🎉'; mem.end = 1; }
+            gR();
+        } else {
+            mem.m++;
+            setTimeout(() => { mem.o = []; if (mem.m > 4) { mem.end = 1; gm = 'Verloren ❌'; } if (view == 'g2') gR(); }, 700);
+        }
+    }
+
+    // ---- Adminpanel ----
+    function admR() {
+        let h = '<h3>🔧 Adminpanel</h3>';
+        const inp = 'style="width:100%;box-sizing:border-box;padding:10px;margin:6px 0"';
+        if (!ADM.on) h += `<input id="pw" type="password" placeholder="Passwort" ${inp}><div class="g"><button class="b" onclick="if($('pw').value==ADMIN_PW){ADM.on=1;render()}else toast('Falsches Passwort')">Anmelden</button></div>`;
+        else h += `<small>Zahl eingeben (negativ = abziehen)</small><input id="av" type="number" value="1000" ${inp}><div class="g"><button onclick="adm('c')">+ Chips</button><button onclick="adm('m')">+ Geld</button></div><h4>📈 Kurs (jetzt ${price.toFixed(2)})</h4><div class="g"><button onclick="adm('p')">Kurs setzen</button><button onclick="adm('x')">×2</button><button onclick="adm('h')">÷2</button></div><div class="g"><button onclick="ADM.frz^=1;render()">${ADM.frz ? '🔒 Kurs fixiert (tippen zum Lösen)' : 'Kurs fixieren'}</button></div><h4>🌍 Welten</h4><div class="g"><button onclick="S.unl=[1,1,1];save();toast('Alle Welten offen')">Alle freischalten</button></div><div class="g"><button class="red" onclick="resetAll()">⚠ Alles zurücksetzen</button></div>`;
+        $('mb').innerHTML = h;
+    }
+    function adm(t) {
+        const v = parseFloat($('av').value);
+        if (isNaN(v)) return toast('Zahl eingeben');
+        if (t == 'c') S.chips = Math.max(0, S.chips + v);
+        if (t == 'm') S.money = Math.max(0, S.money + v);
+        if (t == 'p') price = Math.max(.01, v);
+        if (t == 'x') price *= 2;
+        if (t == 'h') price /= 2;
+        save(); toast('OK'); render();
+    }
+    function resetAll() {
+        if (confirm('Wirklich ALLES zurücksetzen?\nGeld, Chips, Upgrades und Welten gehen verloren.')) {
+            window.noSave = 1;
+            localStorage.removeItem('tz1');
+            location.reload();
+        }
+    }
+    // ---- Spielername & Taucher-Anpassung ----
+    const CC = [0xff7a1a, 0x2a7fff, 0xe63946, 0x2ecc71, 0xb06af0, 0x222222, 0xffd23d];
+    const SK = [0xffd2a6, 0xe8b48a, 0xc68642, 0x8d5524, 0x5a3a22];
+    const TKC = [0x888888, 0xffd23d, 0x2a7fff, 0xe63946, 0x2ecc71];
+    const HATS = ['Keine', '🧢 Mütze', '👑 Krone', '⛑ Helm'];
+    let hatM = null;
+    const tag = new THREE.Sprite(new THREE.SpriteMaterial({ transparent: true }));
+    tag.scale.set(2.4, .6, 1);
+    tag.position.y = 1.7;
+    pg.add(tag);
+    function tagUpd() {
+        const k = document.createElement('canvas');
+        k.width = 256; k.height = 64;
+        const x = k.getContext('2d');
+        x.fillStyle = '#000a'; x.fillRect(0, 8, 256, 48);
+        x.fillStyle = '#fff'; x.font = 'bold 32px sans-serif'; x.textAlign = 'center';
+        x.fillText(S.nm, 128, 44);
+        tag.material.map = new THREE.CanvasTexture(k);
+        tag.material.needsUpdate = true;
+    }
+    function cApply() {
+        const c = S.cs;
+        pgB.material.color.setHex(c.b);
+        pgH.material.color.setHex(c.h);
+        pgT.material.color.setHex(c.t);
+        if (hatM) { pg.remove(hatM); hatM = null; }
+        const g = [null, new THREE.ConeGeometry(.3, .5, 12), new THREE.CylinderGeometry(.28, .2, .3, 8), new THREE.SphereGeometry(.36, 12, 12, 0, Math.PI * 2, 0, Math.PI / 2)][c.hat];
+        if (g) {
+            hatM = new THREE.Mesh(g, M([0, c.b, 0xffd23d, 0xcccccc][c.hat]));
+            hatM.position.y = [0, 1.15, 1.1, .78][c.hat];
+            pg.add(hatM);
+        }
+    }
+    const hx = v => '#' + v.toString(16).padStart(6, '0');
+    const sw = (k, a) => a.map(v => `<button onclick="cset('${k}',${v})" style="background:${hx(v)};width:36px;height:36px;border-radius:50%;border:2px solid #fff;padding:0"></button>`).join(' ');
+    function cset(k, v) { S.cs[k] = v; cApply(); save(); }
+    function cuR() {
+        $('mb').innerHTML = `<h3>🤿 Dein Taucher</h3><small>Name (max. 16 Zeichen)</small><input id="pn" maxlength="16" value="${S.nm.replace(/"/g, '')}" placeholder="Spielername" style="width:100%;box-sizing:border-box;padding:10px;margin:6px 0 10px"><p>Anzug<br>${sw('b', CC)}</p><p>Haut<br>${sw('h', SK)}</p><p>Sauerstofftank<br>${sw('t', TKC)}</p><p>Kopfschmuck<br>${HATS.map((n, i) => `<button onclick="cset('hat',${i})">${n}</button>`).join(' ')}</p><div class="g"><button class="b" onclick="cOk()">Los geht's!</button></div>`;
+    }
+    function cOk() {
+        const n = $('pn').value.trim().slice(0, 16);
+        if (!n) return toast('Bitte einen Namen eingeben');
+        S.nm = n; tagUpd(); save(); closeM(); toast('Willkommen, ' + n + '!');
+    }
+    const _cm = closeM;
+    closeM = function () { if (view == 'cust' && !S.nm) return; _cm(); };
+    cApply(); tagUpd();
+    if (!S.nm) openM('cust');
+    setW(S.w);
+
+    </script>
+</body>
+
+</html>
