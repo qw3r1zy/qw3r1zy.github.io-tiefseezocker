@@ -272,6 +272,7 @@
     </div>
 
     <script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"></script>
+    <script src="https://unpkg.com/peerjs@1.5.4/dist/peerjs.min.js"></script>
     <script>
 
     // ============================================================
@@ -1314,12 +1315,20 @@
         let h = '<h3>🔧 Adminpanel</h3>';
         const inp = 'style="width:100%;box-sizing:border-box;padding:10px;margin:6px 0"';
         if (!ADM.on) h += `<input id="pw" type="password" placeholder="Passwort" ${inp}><div class="g"><button class="b" onclick="if($('pw').value==ADMIN_PW){ADM.on=1;render()}else toast('Falsches Passwort')">Anmelden</button></div>`;
-        else h += `<small>Zahl eingeben (negativ = abziehen)</small><input id="av" type="number" value="1000" ${inp}><div class="g"><button onclick="adm('c')">+ Chips</button><button onclick="adm('m')">+ Geld</button></div><h4>📈 Kurs (jetzt ${price.toFixed(2)})</h4><div class="g"><button onclick="adm('p')">Kurs setzen</button><button onclick="adm('x')">×2</button><button onclick="adm('h')">÷2</button></div><div class="g"><button onclick="ADM.frz^=1;render()">${ADM.frz ? '🔒 Kurs fixiert (tippen zum Lösen)' : 'Kurs fixieren'}</button></div><h4>🌍 Welten</h4><div class="g"><button onclick="S.unl=[1,1,1];save();toast('Alle Welten offen')">Alle freischalten</button></div><div class="g"><button class="red" onclick="resetAll()">⚠ Alles zurücksetzen</button></div>`;
+        else h += `<h4>🎁 Verschenken</h4><div id="plist"></div><small>Zahl eingeben (negativ = abziehen)</small><input id="av" type="number" value="1000" ${inp}><div class="g"><button onclick="adm('c')">+ Chips</button><button onclick="adm('m')">+ Geld</button></div><h4>📈 Kurs (jetzt ${price.toFixed(2)})</h4><div class="g"><button onclick="adm('p')">Kurs setzen</button><button onclick="adm('x')">×2</button><button onclick="adm('h')">÷2</button></div><div class="g"><button onclick="ADM.frz^=1;render()">${ADM.frz ? '🔒 Kurs fixiert (tippen zum Lösen)' : 'Kurs fixieren'}</button></div><h4>🌍 Welten</h4><div class="g"><button onclick="S.unl=[1,1,1];save();toast('Alle Welten offen')">Alle freischalten</button></div><div class="g"><button class="red" onclick="resetAll()">⚠ Alles zurücksetzen</button></div>`;
         $('mb').innerHTML = h;
+        plR();
     }
     function adm(t) {
         const v = parseFloat($('av').value);
         if (isNaN(v)) return toast('Zahl eingeben');
+        if ((t == 'c' || t == 'm') && ADM.to) {
+            const who = (LB.list.find(x => x.id == ADM.to) || {}).name;
+            if (!who) { ADM.to = null; toast('Spieler ist nicht mehr online'); return render(); }
+            lobbySend({ type: 'gift', to: ADM.to, kind: t, amt: v });
+            ADM.to = null; // nur einmalig: danach wieder du selbst
+            toast('Gesendet an ' + who + ' ✔'); return render();
+        }
         if (t == 'c') S.chips = Math.max(0, S.chips + v);
         if (t == 'm') S.money = Math.max(0, S.money + v);
         if (t == 'p') price = Math.max(.01, v);
@@ -1376,13 +1385,178 @@
     function cOk() {
         const n = $('pn').value.trim().slice(0, 16);
         if (!n) return toast('Bitte einen Namen eingeben');
-        S.nm = n; tagUpd(); save(); closeM(); toast('Willkommen, ' + n + '!');
+        S.nm = n; tagUpd(); save(); lobbyHello(); closeM(); toast('Willkommen, ' + n + '!');
     }
     const _cm = closeM;
     closeM = function () { if (view == 'cust' && !S.nm) return; _cm(); };
     cApply(); tagUpd();
     if (!S.nm) openM('cust');
     setW(S.w);
+
+    // ============================================================
+    // 16. ONLINE-LOBBY (PeerJS) - kein Chat, nur Spielerliste & Geschenke
+    // Der erste Spieler wird automatisch "Host" und verteilt die Liste.
+    // ============================================================
+    const LOBBY_ID = 'tiefsee-zocker-lobby-v1'; // <- hier eine eigene, einzigartige ID eintragen!
+    const LB = { peer: null, host: false, conn: null, conns: {}, names: {}, list: [], myId: null };
+    ADM.to = null; // Geschenk-Empfänger (null = du selbst)
+
+    function lobbyJoin() {
+        if (typeof Peer == 'undefined') return;
+        if (LB.peer) { try { LB.peer.destroy(); } catch (e) { } }
+        LB.host = false; LB.conns = {}; LB.names = {}; LB.pos = {};
+        const p = LB.peer = new Peer(LOBBY_ID);
+        p.on('open', id => { LB.host = true; LB.myId = id; LB.names[id] = S.nm; hostUpdate(); hostListen(p); });
+        p.on('error', e => { if (e.type == 'unavailable-id') lobbyClient(); });
+        p.on('disconnected', () => { try { p.reconnect(); } catch (e) { } });
+    }
+    function hostListen(p) {
+        p.on('connection', c => {
+            c.on('open', () => { LB.conns[c.peer] = c; });
+            c.on('data', d => {
+                if (d.type == 'hello') { LB.names[c.peer] = String(d.name || '').slice(0, 16); hostUpdate(); }
+                if (d.type == 'gift') hostRoute(d, c.peer);
+                if (d.type == 'pos') { d.ts = Date.now(); LB.pos[c.peer] = d; }
+            });
+            c.on('close', () => { delete LB.conns[c.peer]; delete LB.names[c.peer]; delete LB.pos[c.peer]; hostUpdate(); });
+        });
+    }
+    function hostUpdate() {
+        LB.list = Object.keys(LB.names).map(id => ({ id, name: LB.names[id] }));
+        Object.values(LB.conns).forEach(c => c.open && c.send({ type: 'players', list: LB.list }));
+        plR();
+    }
+    function hostRoute(d, from) {
+        const m = { type: 'gift', kind: d.kind, amt: d.amt, from: LB.names[from] || 'Jemand' };
+        if (d.to == LB.myId) giftGot(m);
+        else if (LB.conns[d.to] && LB.conns[d.to].open) LB.conns[d.to].send(m);
+    }
+    function lobbyClient() {
+        LB.peer.destroy();
+        const p = LB.peer = new Peer();
+        p.on('open', id => {
+            LB.myId = id;
+            const c = LB.conn = p.connect(LOBBY_ID);
+            c.on('open', lobbyHello);
+            c.on('data', d => {
+                if (d.type == 'players') { LB.list = d.list; plR(); }
+                if (d.type == 'gift') giftGot(d);
+                if (d.type == 'snap') remUpdate(d.s);
+            });
+            c.on('close', () => setTimeout(lobbyJoin, 1000 + Math.random() * 2000));
+        });
+        p.on('error', e => { if (e.type == 'peer-unavailable' || e.type == 'network') setTimeout(lobbyJoin, 1500 + Math.random() * 2000); });
+    }
+    function lobbyHello() {
+        if (LB.host) { LB.names[LB.myId] = S.nm; hostUpdate(); }
+        else if (LB.conn && LB.conn.open) LB.conn.send({ type: 'hello', name: S.nm });
+    }
+    function lobbySend(d) {
+        if (LB.host) hostRoute(d, LB.myId);
+        else if (LB.conn && LB.conn.open) LB.conn.send(d);
+    }
+    function giftGot(d) {
+        const v = Number(d.amt);
+        if (!isFinite(v)) return;
+        if (d.kind == 'm') S.money = Math.max(0, S.money + v);
+        if (d.kind == 'c') S.chips = Math.max(0, S.chips + v);
+        save();
+        toast('🎁 ' + d.from + ' schenkt dir ' + (d.kind == 'm' ? '$' : '🪙 ') + fmt(v));
+    }
+    // Liste im Adminpanel (nur dort sichtbar)
+    function plR() {
+        const el = $('plist');
+        if (!el || view != 'adm') return;
+        if (ADM.to && !LB.list.some(x => x.id == ADM.to)) ADM.to = null;
+        const others = LB.list.filter(x => x.id != LB.myId);
+        const cur = ADM.to ? (LB.list.find(x => x.id == ADM.to).name || 'Taucher') : 'Du selbst';
+        el.innerHTML = `<small>Empfänger: <b>${cur.replace(/</g, '&lt;')}</b> ${ADM.to ? '(nur für das nächste Mal)' : ''}</small>`
+            + `<div class="g"><button class="${ADM.to ? '' : 'b'}" onclick="ADM.to=null;plR()">Ich selbst</button></div>`
+            + `<div class="g">` + (others.length ? others.map(x => `<button class="${ADM.to == x.id ? 'b' : ''}" onclick="ADM.to='${x.id}';plR()">${(x.name || 'Taucher').replace(/</g, '&lt;')}</button>`).join('') : '<small>Niemand sonst online</small>') + `</div>`;
+    }
+    // ---- Mitspieler im 3D-Spiel sichtbar machen (im Becken und außerhalb) ----
+    LB.pos = {}; LB.rem = {};
+    const RG = { b: new THREE.CylinderGeometry(.35, .35, 1, 12), h: new THREE.SphereGeometry(.3, 12, 12), t: new THREE.CylinderGeometry(.18, .18, .8, 10) };
+    const HG = [null, new THREE.ConeGeometry(.3, .5, 12), new THREE.CylinderGeometry(.28, .2, .3, 8), new THREE.SphereGeometry(.36, 12, 12, 0, Math.PI * 2, 0, Math.PI / 2)];
+    function remTex(name) {
+        const k = document.createElement('canvas');
+        k.width = 256; k.height = 64;
+        const x = k.getContext('2d');
+        x.fillStyle = '#000a'; x.fillRect(0, 8, 256, 48);
+        x.fillStyle = '#fff'; x.font = 'bold 32px sans-serif'; x.textAlign = 'center';
+        x.fillText(name, 128, 44);
+        return new THREE.CanvasTexture(k);
+    }
+    function remMake(id) {
+        const g = new THREE.Group();
+        const b = new THREE.Mesh(RG.b, M(0xff7a1a)), h = new THREE.Mesh(RG.h, M(0xffd2a6)), t = new THREE.Mesh(RG.t, M(0x888888));
+        h.position.y = .7; t.position.set(0, .1, -.4);
+        const tg = new THREE.Sprite(new THREE.SpriteMaterial({ transparent: true }));
+        tg.scale.set(2.4, .6, 1); tg.position.y = 1.7;
+        g.add(b, h, t, tg); g.visible = false; sc.add(g);
+        return LB.rem[id] = { g, b, h, t, tg, hat: null, hk: '', nm: null, tx: 0, ty: 0, tz: 0, r: 0, w: 0, seen: 0, init: 0 };
+    }
+    function remUpdate(list) {
+        const now = performance.now();
+        (list || []).forEach(d => {
+            if (d.id == LB.myId) return;
+            const r = LB.rem[d.id] || remMake(d.id), c = d.cs || {};
+            if (d.nm !== r.nm) {
+                r.nm = d.nm;
+                if (r.tg.material.map) r.tg.material.map.dispose();
+                r.tg.material.map = remTex(String(d.nm || 'Taucher').slice(0, 16));
+                r.tg.material.needsUpdate = true;
+            }
+            r.b.material.color.setHex(c.b || 0xff7a1a);
+            r.h.material.color.setHex(c.h || 0xffd2a6);
+            r.t.material.color.setHex(c.t || 0x888888);
+            const hk = (c.hat || 0) + '/' + c.b;
+            if (hk !== r.hk) {
+                r.hk = hk;
+                if (r.hat) { r.g.remove(r.hat); r.hat = null; }
+                const i = c.hat || 0;
+                if (HG[i]) {
+                    r.hat = new THREE.Mesh(HG[i], M([0, c.b, 0xffd23d, 0xcccccc][i]));
+                    r.hat.position.y = [0, 1.15, 1.1, .78][i];
+                    r.g.add(r.hat);
+                }
+            }
+            r.tx = d.x; r.ty = d.y; r.tz = d.z; r.r = d.r; r.w = d.w; r.seen = now;
+            if (!r.init) { r.init = 1; r.g.position.set(d.x, d.y, d.z); r.g.rotation.y = d.r; }
+        });
+    }
+    // 10x pro Sekunde: Position senden (Host verteilt an alle)
+    setInterval(() => {
+        if (!S.nm || !LB.myId) return;
+        const m = { x: +pg.position.x.toFixed(2), y: +pg.position.y.toFixed(2), z: +pg.position.z.toFixed(2), r: +pg.rotation.y.toFixed(2), w: S.w, nm: S.nm, cs: S.cs };
+        if (LB.host) {
+            const now = Date.now();
+            Object.keys(LB.pos).forEach(id => { if (now - LB.pos[id].ts > 5000) delete LB.pos[id]; });
+            const snap = Object.keys(LB.pos).map(id => Object.assign({ id }, LB.pos[id]));
+            snap.push(Object.assign({ id: LB.myId }, m));
+            Object.values(LB.conns).forEach(c => c.open && c.send({ type: 'snap', s: snap }));
+            remUpdate(snap);
+        } else if (LB.conn && LB.conn.open) LB.conn.send(Object.assign({ type: 'pos' }, m));
+    }, 100);
+    // Weiche Bewegung der Mitspieler; nur Spieler aus deiner Welt sichtbar
+    let rl = performance.now();
+    (function remLoop(now) {
+        requestAnimationFrame(remLoop);
+        const k = 1 - Math.exp(-Math.min(.1, (now - rl) / 1000) * 12);
+        rl = now;
+        Object.keys(LB.rem).forEach(id => {
+            const r = LB.rem[id];
+            if (now - r.seen > 4000) { sc.remove(r.g); if (r.tg.material.map) r.tg.material.map.dispose(); delete LB.rem[id]; return; }
+            r.g.visible = r.w === S.w;
+            r.g.position.x += (r.tx - r.g.position.x) * k;
+            r.g.position.y += (r.ty - r.g.position.y) * k;
+            r.g.position.z += (r.tz - r.g.position.z) * k;
+            const a = Math.atan2(Math.sin(r.r - r.g.rotation.y), Math.cos(r.r - r.g.rotation.y));
+            r.g.rotation.y += a * k;
+        });
+    })(performance.now());
+
+    lobbyJoin();
 
     </script>
 </body>
