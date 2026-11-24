@@ -1390,30 +1390,55 @@
     }
 
     // ---- Schwarzes Brett (alle lesen, nur Admins schreiben) ----
+    const bbC = document.createElement('canvas');
+    bbC.width = 1024; bbC.height = 512;
+    const bbTex = new THREE.CanvasTexture(bbC);
+    function drawBB() {
+        const x = bbC.getContext('2d'), list = (typeof LB != 'undefined' && LB.board) || [];
+        x.fillStyle = '#0a0a0a'; x.fillRect(0, 0, 1024, 512);
+        x.strokeStyle = '#ffd23d'; x.lineWidth = 8; x.strokeRect(8, 8, 1008, 496);
+        x.textAlign = 'center'; x.fillStyle = '#ffd23d'; x.font = 'bold 48px sans-serif';
+        x.fillText('📌 SCHWARZES BRETT', 512, 70);
+        x.textAlign = 'left'; x.font = 'bold 34px sans-serif';
+        let y = 128;
+        if (!list.length) { x.fillStyle = '#fff'; x.fillText('Noch keine Nachrichten.', 40, y); }
+        for (const m of list) {
+            const words = ('👑 ' + m.by + ': ' + m.t).split(' ');
+            let line = '', first = true;
+            const out = [];
+            for (const w of words) {
+                const t = line ? line + ' ' + w : w;
+                if (x.measureText(t).width > 940 && line) { out.push(line); line = w; } else line = t;
+            }
+            out.push(line);
+            if (y + out.length * 40 > 490) break;
+            out.forEach((l, i) => { x.fillStyle = i == 0 ? '#ffd23d' : '#fff'; x.fillText(l, 40, y); y += 40; });
+            y += 14;
+        }
+        bbTex.needsUpdate = true;
+    }
     {
         const g = new THREE.Group();
         g.position.set(0, 0, 19);
-        const bo = new THREE.Mesh(new THREE.BoxGeometry(7, 3.4, .3), M(0x111111));
-        bo.position.y = 3.4;
-        const fr = new THREE.Mesh(new THREE.BoxGeometry(7.4, 3.8, .2), M(0x6b4a2a));
-        fr.position.set(0, 3.4, -.1);
-        const p1 = new THREE.Mesh(new THREE.BoxGeometry(.3, 3.4, .3), M(0x6b4a2a));
-        p1.position.set(-3, 1.7, 0);
+        const fr = new THREE.Mesh(new THREE.BoxGeometry(9.8, 5.4, .3), M(0x6b4a2a));
+        fr.position.y = 5.4;
+        const bo = new THREE.Mesh(new THREE.PlaneGeometry(9.2, 4.6), new THREE.MeshBasicMaterial({ map: bbTex, fog: false }));
+        bo.rotation.y = Math.PI; // Vorderseite zeigt zum Becken
+        bo.position.set(0, 5.4, -.17);
+        const p1 = new THREE.Mesh(new THREE.BoxGeometry(.3, 3, .3), M(0x6b4a2a));
+        p1.position.set(-4.2, 1.5, 0);
         const p2 = p1.clone();
-        p2.position.x = 3;
-        const sp = new THREE.Sprite(new THREE.SpriteMaterial({ map: sg('📌 SCHWARZES BRETT') }));
-        sp.scale.set(6, 1.5, 1);
-        sp.position.y = 6;
-        g.add(fr, bo, p1, p2, sp);
+        p2.position.x = 4.2;
+        g.add(fr, bo, p1, p2);
         sc.add(g);
     }
     const esc = t => String(t).replace(/&/g, '&amp;').replace(/</g, '&lt;');
     function bbR() {
         const old = $('bbt') ? $('bbt').value : '';
         const list = LB.board || [];
-        let h = '<h3>📌 Schwarzes Brett</h3>' + (list.length ? list.map(x => `<div class="r"><div><b style="color:#ffd23d">👑 ${esc(x.by)}</b> <small>${new Date(x.ts).toLocaleString('de-DE', { day: '2-digit', month: '2-digit', hour: '2-digit', minute: '2-digit' })}</small><br>${esc(x.t)}</div></div>`).join('') : '<small>Noch keine Nachrichten.</small>');
-        if (S.adm) h += '<input id="bbt" maxlength="140" placeholder="Nachricht (max. 140 Zeichen)" style="width:100%;box-sizing:border-box;padding:10px;margin:10px 0 6px"><div class="g"><button class="b" onclick="bbPost()">Anpinnen</button><button class="red" onclick="bbClear()">Alles löschen</button></div>';
-        else h += '<p><small>🔒 Nur Admins dürfen auf das Schwarze Brett schreiben.</small></p>';
+        let h = '<h3>📌 Schwarzes Brett</h3><div style="background:#fff;color:#111;border-radius:10px;padding:4px 10px">' + (list.length ? list.map(x => `<div class="r" style="border-bottom:1px solid #0002"><div style="color:#111"><b style="color:#9a6400">👑 ${esc(x.by)}</b> <small>${new Date(x.ts).toLocaleString('de-DE', { day: '2-digit', month: '2-digit', hour: '2-digit', minute: '2-digit' })}</small><br>${esc(x.t)}</div></div>`).join('') : '<small>Noch keine Nachrichten.</small>') + '</div>';
+        if (S.adm) h += '<input id="bbt" maxlength="140" placeholder="Nachricht (max. 140 Zeichen)" style="color:#000;background:#fff;border:1px solid #888;border-radius:8px;width:100%;box-sizing:border-box;padding:10px;margin:10px 0 6px"><div class="g"><button class="b" onclick="bbPost()">Anpinnen</button><button class="red" onclick="bbClear()">Alles löschen</button></div>';
+        else h += '<p><small style="opacity:1">🔒 Nur Admins dürfen auf das Schwarze Brett schreiben.</small></p>';
         $('mb').innerHTML = h;
         if ($('bbt')) $('bbt').value = old;
     }
@@ -1433,7 +1458,7 @@
         boardGot(LB.board);
         Object.values(LB.conns).forEach(c => c.open && c.send({ type: 'board', list: LB.board }));
     }
-    function boardGot(l) { LB.board = l || []; S.bd = LB.board; save(); if (view == 'bb') bbR(); }
+    function boardGot(l) { LB.board = l || []; S.bd = LB.board; save(); drawBB(); if (view == 'bb') bbR(); }
 
     // ---- Adminpanel ----
     function admR() {
@@ -1696,6 +1721,7 @@
         });
     })(performance.now());
 
+    drawBB();
     setInterval(() => { if (view == 'adm') plR(); }, 1000);
     lobbyJoin();
 
