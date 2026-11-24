@@ -277,6 +277,7 @@
         <button class="b" id="bfi" style="display:none" onclick="openM('fish')">🎣 Angeln</button>
         <button class="b" id="bsc" style="display:none" onclick="openM('tr')">⛏ Schatzsuche</button>
         <button class="b" id="bbd" style="display:none" onclick="openM('bb')">📌 Schwarzes Brett</button>
+        <button class="b" id="zpo" style="display:none" onclick="zClick()">🌀</button>
         <button class="b" id="bpo" style="display:none" onclick="openM('portal')">🌀 Portal</button>
         <button class="b" id="bg1" style="display:none" onclick="openM('g1')"></button>
         <button class="b" id="bg2" style="display:none" onclick="openM('g2')"></button>
@@ -284,6 +285,9 @@
 
     <!-- Toast-Meldung -->
     <div id="t"></div>
+    <div id="hpw" style="display:none;position:fixed;left:50%;transform:translateX(-50%);top:64px;width:220px;z-index:20;text-align:center;font-size:13px;color:#fff;text-shadow:0 1px 3px #000"><div style="height:14px;background:#0009;border:2px solid #fff;border-radius:8px;overflow:hidden"><div id="hpb" style="height:100%;background:#e74c3c;width:100%"></div></div><span id="hpt"></span></div>
+    <div id="xh" style="display:none;position:fixed;left:50%;top:50%;transform:translate(-50%,-50%);color:#fff;font-size:26px;z-index:15;pointer-events:none;text-shadow:0 0 4px #000">+</div>
+    <button id="atk" style="display:none;position:fixed;right:18px;bottom:120px;z-index:20;width:88px;height:88px;border-radius:50%;font-size:36px;background:#c0392b;border:3px solid #fff;color:#fff;touch-action:none">⚔</button>
     <div id="kp"></div>
 
     <!-- Menü-Overlay -->
@@ -669,8 +673,7 @@
             p.x = Math.max(-6.5, Math.min(6.5, p.x));
             p.z = Math.max(-6.5, Math.min(6.5, p.z));
         }
-        p.x = Math.max(-28, Math.min(28, p.x));
-        p.z = Math.max(-28, Math.min(28, p.z));
+        clampZone();
         if (p.y < -.6)
             p.o2 -= dt;
         else
@@ -727,6 +730,7 @@
         sc.background.set(uw ? TH.uw : TH.sky);
         sc.fog.color.set(uw ? TH.uw : TH.sky);
         sc.fog.density = uw ? .05 : .004;
+        zoneCam(sy, cy);
         const nc = Math.hypot(p.x, p.z + 19) < 5;
         $('bcas').style.display = nc ? '' : 'none';
         if (!nc && view == 'cas')
@@ -775,6 +779,8 @@
         if (view == 'g1' || view == 'g2') gR();
         if (view == 'adm') admR();
         if (view == 'bb') bbR();
+        if (view == 'pm') pmR();
+        if (view == 'ar') arR();
         if (view == 'tr')
             treasR();
         if (view == 'help')
@@ -1026,7 +1032,7 @@
     // ============================================================
     // 13. ANGELN (Fische, Sammelbuch, Quests)
     // ============================================================
-    const FISH = [['Sardine', '🐟', 60, 4, 1200], ['Forelle', '🐠', 25, 10, 950], ['Karpfen', '🐡', 10, 25, 750], ['Hecht', '🦈', 4, 60, 580], ['Goldener Koi', '🎏', .9, 200, 420], ['Tiefsee-Krake', '🐙', .1, 1000, 350]];
+    const FISH = [['Sardine', '🐟', 60, 4, 1200], ['Forelle', '🐠', 25, 10, 950], ['Karpfen', '🐡', 10, 25, 750], ['Hecht', '🦈', 4, 60, 580], ['Goldener Koi', '🎏', .9, 200, 420], ['Tiefsee-Krake', '🐙', .1, 1000, 350], ['Phantom-Aal', '👻', .05, 5000, 300, 1], ['Mondfisch', '🌙', .03, 12000, 260, 1], ['Leviathan', '🐉', .02, 30000, 220, 1]];
     const QS = [['Sardine', 5, 40], ['Forelle', 3, 80], ['Karpfen', 2, 150], ['Hecht', 1, 250], ['Goldener Koi', 1, 600]];
     const FSUM = FISH.reduce((a, f) => a + f[2], 0);
     function rollFish() {
@@ -1076,7 +1082,8 @@
                 keyPop('Schlüssel gefunden!<br><small>Bring ihn zum Portal ganz unten im Becken</small>');
                 gotKey = 1;
             }
-            fmsg = 'Gefangen: ' + fcur[1] + ' ' + fcur[0] + '!' + (gotKey ? '<br>🔑 Du hast einen Schlüssel bekommen!' : '');
+            if (fcur[5]) keyPop('🤫 GEHEIMER FISCH!<br>' + fcur[1] + ' ' + fcur[0]);
+            fmsg = (fcur[5] ? '🤫 Geheimer Fisch! ' : '') + 'Gefangen: ' + fcur[1] + ' ' + fcur[0] + '!' + (gotKey ? '<br>🔑 Du hast einen Schlüssel bekommen!' : '');
             save();
             fishR();
         }
@@ -1127,7 +1134,7 @@
         if (view != 'fish')
             return;
         const q = QS[S.q];
-        $('mb').innerHTML = `<h3>🎣 Angelhaus</h3><div style="text-align:center;font-size:20px;min-height:56px;margin:6px 0">${fmsg || 'Wirf die Angel aus und zieh, sobald es anbeißt!'}</div><div class="g"><button class="b" style="font-size:20px;padding:18px" onclick="fAct()">${fst == 'idle' ? 'Angel auswerfen' : fst == 'wait' ? 'Warten …' : 'JETZT ZIEHEN!'}</button></div><h4>📖 Sammelbuch</h4>${FISH.map(f => `<div class="r"><span>${S.seen[f[0]] ? f[1] + ' ' + f[0] : '❓ ???'}</span><small>${odds(f[2])} · ${f[2] < 1 ? 'legendär' : f[2] < 5 ? 'selten' : 'häufig'} · ${S.seen[f[0]] ? 'im Beutel: ' + (S.fish[f[0]] || 0) + ' · $' + f[3] : 'unentdeckt'}</small></div>`).join('')}<div class="g"><button onclick="fSell()">Alle verkaufen</button><button onclick="fCook()">Kochen (Buff)</button></div><h4>📜 Quest</h4>${q ? `<div class="r"><span>${q[1]}× ${q[0]} abgeben<br><small>Belohnung $${q[2]}</small></span><button class="b" onclick="fQ()">Abgeben</button></div>` : '<small>Alle Quests erledigt!</small>'}`;
+        $('mb').innerHTML = `<h3>🎣 Angelhaus</h3><div style="text-align:center;font-size:20px;min-height:56px;margin:6px 0">${fmsg || 'Wirf die Angel aus und zieh, sobald es anbeißt!'}</div><div class="g"><button class="b" style="font-size:20px;padding:18px" onclick="fAct()">${fst == 'idle' ? 'Angel auswerfen' : fst == 'wait' ? 'Warten …' : 'JETZT ZIEHEN!'}</button></div><h4>📖 Sammelbuch</h4>${FISH.filter(f => !f[5] || S.seen[f[0]]).map(f => `<div class="r"><span>${S.seen[f[0]] ? f[1] + ' ' + f[0] : '❓ ???'}</span><small>${f[5] ? '🤫 geheim' : odds(f[2]) + ' · ' + (f[2] < 1 ? 'legendär' : f[2] < 5 ? 'selten' : 'häufig')} · ${S.seen[f[0]] ? 'im Beutel: ' + (S.fish[f[0]] || 0) + ' · $' + f[3] : 'unentdeckt'}</small></div>`).join('')}<div class="g"><button onclick="fSell()">Alle verkaufen</button><button onclick="fCook()">Kochen (Buff)</button></div><h4>📜 Quest</h4>${q ? `<div class="r"><span>${q[1]}× ${q[0]} abgeben<br><small>Belohnung $${q[2]}</small></span><button class="b" onclick="fQ()">Abgeben</button></div>` : '<small>Alle Quests erledigt!</small>'}`;
     }
 
     // ============================================================
@@ -1465,9 +1472,15 @@
         let h = '<h3>🔧 Adminpanel</h3>';
         const inp = 'style="width:100%;box-sizing:border-box;padding:10px;margin:6px 0"';
         if (!ADM.on) h += `<input id="pw" type="password" placeholder="Passwort" ${inp}><div class="g"><button class="b" onclick="if($('pw').value==ADMIN_PW){ADM.on=1;S.adm=1;tagUpd();lobbyHello();save();render()}else toast('Falsches Passwort')">Anmelden</button></div>`;
-        else h += `<h4>🎁 Verschenken</h4><div id="plist"></div><small>Zahl eingeben (negativ = abziehen)</small><input id="av" type="number" value="1000" ${inp}><div class="g"><button onclick="adm('c')">+ Chips</button><button onclick="adm('m')">+ Geld</button></div><h4>📈 Kurs (jetzt ${price.toFixed(2)})</h4><div class="g"><button onclick="adm('p')">Kurs setzen</button><button onclick="adm('x')">×2</button><button onclick="adm('h')">÷2</button></div><div class="g"><button onclick="ADM.frz^=1;render()">${ADM.frz ? '🔒 Kurs fixiert (tippen zum Lösen)' : 'Kurs fixieren'}</button></div><h4>🌍 Welten</h4><div class="g"><button onclick="S.unl=[1,1,1];save();toast('Alle Welten offen')">Alle freischalten</button></div><div class="g"><button class="red" onclick="resetAll()">⚠ Alles zurücksetzen</button></div>`;
+        else h += `<h4>🎁 Verschenken</h4><div id="plist"></div><small>Zahl eingeben (negativ = abziehen)</small><input id="av" type="number" value="1000" ${inp}><div class="g"><button onclick="adm('c')">+ Chips</button><button onclick="adm('m')">+ Geld</button></div><h4>🎣 Fische geben</h4><small>Anzahl (negativ = abziehen). 🤫 = Secret-Fisch</small><input id="afc" type="number" value="1" ${inp}><div class="g">${FISH.map((f, i) => `<button onclick="admFish(${i})">${f[1]} ${f[0]}${f[5] ? ' 🤫' : ''}</button>`).join('')}</div><h4>📈 Kurs (jetzt ${price.toFixed(2)})</h4><div class="g"><button onclick="adm('p')">Kurs setzen</button><button onclick="adm('x')">×2</button><button onclick="adm('h')">÷2</button></div><div class="g"><button onclick="ADM.frz^=1;render()">${ADM.frz ? '🔒 Kurs fixiert (tippen zum Lösen)' : 'Kurs fixieren'}</button></div><h4>🌍 Welten</h4><div class="g"><button onclick="S.unl=[1,1,1];save();toast('Alle Welten offen')">Alle freischalten</button></div><div class="g"><button class="red" onclick="resetAll()">⚠ Alles zurücksetzen</button></div>`;
         $('mb').innerHTML = h;
         plR();
+    }
+    function admFish(i) {
+        const f = FISH[i], n = parseInt($('afc').value) || 1;
+        S.fish[f[0]] = Math.max(0, (S.fish[f[0]] || 0) + n);
+        if (n > 0) S.seen[f[0]] = 1;
+        save(); toast((n > 0 ? '+' : '') + n + '× ' + f[1] + ' ' + f[0]); render();
     }
     function adm(t) {
         const v = parseFloat($('av').value);
@@ -1554,13 +1567,13 @@
     // Der erste Spieler wird automatisch "Host" und verteilt die Liste.
     // ============================================================
     const LOBBY_ID = 'tiefsee-zocker-lobby-v1'; // <- hier eine eigene, einzigartige ID eintragen!
-    const LB = { board: S.bd || [], adm: {}, peer: null, host: false, conn: null, conns: {}, names: {}, list: [], myId: null };
+    const LB = { board: S.bd || [], adm: {}, last: {}, peer: null, host: false, conn: null, conns: {}, names: {}, list: [], myId: null };
     ADM.to = null; // Geschenk-Empfänger (null = du selbst)
 
     function lobbyJoin() {
         if (typeof Peer == 'undefined') return;
         if (LB.peer) { try { LB.peer.destroy(); } catch (e) { } }
-        LB.host = false; LB.conns = {}; LB.names = {}; LB.pos = {}; LB.adm = {};
+        LB.host = false; LB.conns = {}; LB.names = {}; LB.pos = {}; LB.adm = {}; LB.last = {};
         const p = LB.peer = new Peer(LOBBY_ID);
         p.on('open', id => { LB.host = true; LB.myId = id; LB.names[id] = S.nm; hostUpdate(); hostListen(p); });
         p.on('error', e => { if (e.type == 'unavailable-id') lobbyClient(); });
@@ -1569,17 +1582,20 @@
     function hostListen(p) {
         p.on('connection', c => {
             LB.conns[c.peer] = c; // sofort registrieren (sonst bekommt der Mitspieler nie Daten/Geschenke)
+            LB.last[c.peer] = Date.now();
             const hi = () => { LB.conns[c.peer] = c; if (c.open) { c.send({ type: 'players', list: LB.list }); c.send({ type: 'board', list: LB.board }); } };
             if (c.open) hi();
             c.on('open', hi);
             c.on('error', () => { });
             c.on('data', d => {
+                LB.last[c.peer] = Date.now();
                 if (d.type == 'hello') { LB.names[c.peer] = String(d.name || '').slice(0, 16); LB.adm[c.peer] = d.ad ? 1 : 0; hostUpdate(); }
                 if (d.type == 'bpost' || d.type == 'bclear') hostBoard(d, c.peer);
                 if (d.type == 'gift') hostRoute(d, c.peer);
+                if (d.type == 'hit' || d.type == 'kill') hostFwd(d, c.peer);
                 if (d.type == 'pos') { LB.adm[c.peer] = d.ad ? 1 : 0; d.ts = Date.now(); LB.pos[c.peer] = d; }
             });
-            c.on('close', () => { delete LB.conns[c.peer]; delete LB.names[c.peer]; delete LB.pos[c.peer]; hostUpdate(); });
+            c.on('close', () => { delete LB.conns[c.peer]; delete LB.names[c.peer]; delete LB.pos[c.peer]; delete LB.adm[c.peer]; delete LB.last[c.peer]; hostUpdate(); });
         });
     }
     function hostUpdate() {
@@ -1605,9 +1621,12 @@
                 if (d.type == 'players') { LB.list = d.list; plR(); }
                 if (d.type == 'gift') giftGot(d);
                 if (d.type == 'snap') remUpdate(d.s);
+                if (d.type == 'hit') gotHit(d);
+                if (d.type == 'kill') gotKill(d);
+                if (d.type == 'rank') rkMerge(d.lb);
                 if (d.type == 'board') boardGot(d.list);
             });
-            c.on('close', () => setTimeout(lobbyJoin, 1000 + Math.random() * 2000));
+            c.on('close', () => { LB.list = []; plR(); setTimeout(lobbyJoin, 1000 + Math.random() * 2000); });
         });
         p.on('error', e => { setTimeout(lobbyJoin, 1500 + Math.random() * 2000); });
     }
@@ -1616,7 +1635,7 @@
         else if (LB.conn && LB.conn.open) LB.conn.send({ type: 'hello', name: S.nm, ad: S.adm ? 1 : 0 });
     }
     function lobbySend(d) {
-        if (LB.host) { if (d.type == 'bpost' || d.type == 'bclear') hostBoard(d, LB.myId); else hostRoute(d, LB.myId); }
+        if (LB.host) { if (d.type == 'bpost' || d.type == 'bclear') hostBoard(d, LB.myId); else if (d.type == 'hit' || d.type == 'kill') hostFwd(d, LB.myId); else hostRoute(d, LB.myId); }
         else if (LB.conn && LB.conn.open) LB.conn.send(d);
     }
     function giftGot(d) {
@@ -1686,14 +1705,14 @@
                     r.g.add(r.hat);
                 }
             }
-            r.tx = d.x; r.ty = d.y; r.tz = d.z; r.r = d.r; r.w = d.w; r.seen = now;
+            r.d = d; r.tx = d.x; r.ty = d.y; r.tz = d.z; r.r = d.r; r.w = d.w; r.seen = now;
             if (!r.init) { r.init = 1; r.g.position.set(d.x, d.y, d.z); r.g.rotation.y = d.r; }
         });
     }
     // 10x pro Sekunde: Position senden (Host verteilt an alle)
     setInterval(() => {
         if (!S.nm || !LB.myId) return;
-        const m = { x: +pg.position.x.toFixed(2), y: +pg.position.y.toFixed(2), z: +pg.position.z.toFixed(2), r: +pg.rotation.y.toFixed(2), w: S.w, nm: S.nm, ad: S.adm ? 1 : 0, cs: S.cs };
+        const m = { x: +pg.position.x.toFixed(2), y: +pg.position.y.toFixed(2), z: +pg.position.z.toFixed(2), r: +pg.rotation.y.toFixed(2), w: curW(), nm: S.nm, ad: S.adm ? 1 : 0, cs: S.cs, uid: S.uid, mo: Math.floor(S.money), pls: S.plots.map(q => [q.s, q.m, q.c]) };
         if (LB.host) {
             const now = Date.now();
             Object.keys(LB.pos).forEach(id => { if (now - LB.pos[id].ts > 10000) delete LB.pos[id]; });
@@ -1712,7 +1731,7 @@
         Object.keys(LB.rem).forEach(id => {
             const r = LB.rem[id];
             if (now - r.seen > 10000) { sc.remove(r.g); if (r.tg.material.map) r.tg.material.map.dispose(); delete LB.rem[id]; return; }
-            r.g.visible = r.w === S.w;
+            r.g.visible = r.w === curW();
             r.g.position.x += (r.tx - r.g.position.x) * k;
             r.g.position.y += (r.ty - r.g.position.y) * k;
             r.g.position.z += (r.tz - r.g.position.z) * k;
@@ -1721,7 +1740,314 @@
         });
     })(performance.now());
 
+    /*ZONES*/
+    // ============================================================
+    // ZONEN: Plot-Welt (Welt 3) & Arena (Welt 2), Bestenliste
+    // ============================================================
+    S.wp = S.wp || 0; S.ar = S.ar || 0; if (!S.plots) S.plots = (S.plot != null && S.plot >= 0) ? [{ s: S.plot, m: S.wkM || 0, c: S.wkC || 0 }] : [];
+    if (!S.uid) S.uid = Math.random().toString(36).slice(2, 10) + Date.now().toString(36);
+    if (!S.lb) S.lb = {};
+    let zone = 0; // 0 normal, 1 Plot-Welt, 2 Arena
+    const ZCX = [0, 1000, -1000], ZRAD = [28, 45, 22];
+    const curW = () => zone ? 2 + zone : S.w;
+    const dist2 = (x, z) => Math.hypot(p.x - x, p.z - z);
+    function clampZone() {
+        const cx = ZCX[zone], R_ = ZRAD[zone];
+        p.x = Math.max(cx - R_, Math.min(cx + R_, p.x));
+        p.z = Math.max(-R_, Math.min(R_, p.z));
+        if (zone == 2) { const dx = p.x - cx, l = Math.hypot(dx, p.z); if (l > R_) { p.x = cx + dx * R_ / l; p.z *= R_ / l; } }
+    }
+    sc.add(cm);
+    const SWC = [0x8b5a2b, 0xaaaaaa, 0xdddddd, 0x66e0ff, 0xff6a2a, 0xff3030, 0xffd23d];
+    const WPN = ['Holzschwert', 'Eisenschwert', 'Stahlschwert', 'Kristallklinge', 'Magmaklinge', 'Drachenklinge', 'Götterschwert'];
+    const ARN = ['Stoffkleidung', 'Lederrüstung', 'Kettenhemd', 'Plattenrüstung', 'Kristallrüstung', 'Magmarüstung', 'Drachenrüstung'];
+    const sword = new THREE.Group();
+    const blade = new THREE.Mesh(new THREE.BoxGeometry(.08, .08, 1.1), M(0x8b5a2b));
+    blade.position.z = -.55;
+    const hilt = new THREE.Mesh(new THREE.BoxGeometry(.3, .06, .08), M(0x333333));
+    sword.add(blade, hilt);
+    sword.position.set(.45, -.35, -.8); sword.rotation.set(-.5, 0, .1); sword.visible = false;
+    cm.add(sword);
+    const fbg = new THREE.MeshBasicMaterial({ color: 0x2f5a2f });
+    const mkBox = (w, h, d, x, y, z, c, par) => { const m = new THREE.Mesh(new THREE.BoxGeometry(w, h, d), M(c)); m.position.set(x, y, z); (par || sc).add(m); return m; };
+    const lbl = (txt, x, y, z, sx, ad) => { const sp = new THREE.Sprite(new THREE.SpriteMaterial({ map: remTex(txt, ad) })); sp.scale.set(sx || 5, (sx || 5) / 4, 1); sp.position.set(x, y, z); sc.add(sp); return sp; };
+    // --- Portale in den Welten ---
+    const pPlotP = mkPortal(-18, 3, 2, 0xffd23d, '🏗 Plot-Welt');
+    const pArenaP = mkPortal(18, 3, 2, 0xff3030, '🏟 Arena · $10.000');
+    // --- Plot-Welt ---
+    const CX1 = ZCX[1], CX2 = ZCX[2];
+    mkBox(110, .2, 110, CX1, -.3, 0, 0x2f5a2f);
+    mkBox(8, 2.5, 3, CX1, 1.25, 24, 0x6b4a2a); lbl('🏢 Plot-Büro', CX1, 3.6, 24, 5);
+    mkPortal(CX1, 3, 36, 0x4da6ff, '↩ Zurück');
+    const PS = [];
+    for (let i = 0; i < 16; i++) {
+        const sx = CX1 - 21 + (i % 4) * 14, sz = -30 + Math.floor(i / 4) * 14;
+        const fl_ = mkBox(10, .2, 10, sx, -.1, sz, 0x3a6b3a);
+        const mine = mkBox(3, 1.2, 3, sx - 3, .6, sz - 3, 0x222222); mine.visible = false;
+        const hole = mkBox(1.6, .05, 1.6, sx - 3, 1.25, sz - 3, 0x000000); hole.visible = false;
+        const desk = mkBox(3.2, .8, 1.6, sx + 3, .4, sz - 3, 0x8a6a3a); desk.visible = false;
+        const scr = mkBox(1.2, .8, .1, sx + 3, 1.2, sz - 3.4, 0x33ccff); scr.visible = false;
+        const sp = lbl('Plot ' + (i + 1) + ' · Frei', sx, 3.3, sz + 4.6, 5);
+        PS.push({ sx, sz, fl: fl_, mine, hole, desk, scr, sp, key: null, wk: [] });
+    }
+    // --- Arena ---
+    {
+        const fl2 = new THREE.Mesh(new THREE.CylinderGeometry(22, 22, .3, 48), M(0x6a5a4a)); fl2.position.set(CX2, -.15, 0); sc.add(fl2);
+        const wl = new THREE.Mesh(new THREE.CylinderGeometry(22.5, 22.5, 8, 48, 1, true), new THREE.MeshBasicMaterial({ color: 0x40304f, side: THREE.BackSide })); wl.position.set(CX2, 4, 0); sc.add(wl);
+        const ring = new THREE.Mesh(new THREE.TorusGeometry(10, .12, 6, 48), new THREE.MeshBasicMaterial({ color: 0xff3030 })); ring.rotation.x = Math.PI / 2; ring.position.set(CX2, .05, 0); sc.add(ring);
+        mkBox(5, 1.4, 2, CX2 - 8, .7, 18, 0x444444); lbl('⚒ Schmied', CX2 - 8, 3, 18, 4);
+        mkPortal(CX2 + 8, 3, 18, 0x4da6ff, '↩ Ausgang');
+    }
+    // --- Bestenliste (Schild in jeder Welt) ---
+    const lbC = document.createElement('canvas'); lbC.width = 1024; lbC.height = 768;
+    const lbTex = new THREE.CanvasTexture(lbC);
+    {
+        const g = new THREE.Group(); g.position.set(0, 0, -13);
+        const fr = new THREE.Mesh(new THREE.BoxGeometry(9.6, 7.2, .3), M(0x6b4a2a)); fr.position.y = 4.6;
+        const bo = new THREE.Mesh(new THREE.PlaneGeometry(9, 6.6), new THREE.MeshBasicMaterial({ map: lbTex, fog: false })); bo.position.set(0, 4.6, .17);
+        const p1 = mkBox(.3, 4, .3, -4.2, 2, 0, 0x6b4a2a, g), p2 = mkBox(.3, 4, .3, 4.2, 2, 0, 0x6b4a2a, g);
+        g.add(fr, bo); sc.add(g);
+    }
+    function lbTop() { return Object.values(S.lb).filter(e => !e.a).sort((a, b) => b.m - a.m).slice(0, 10); }
+    function drawLB() {
+        const x = lbC.getContext('2d'), top = lbTop();
+        x.fillStyle = '#0a0a0a'; x.fillRect(0, 0, 1024, 768);
+        x.strokeStyle = '#ffd23d'; x.lineWidth = 8; x.strokeRect(8, 8, 1008, 752);
+        x.textAlign = 'center'; x.fillStyle = '#ffd23d'; x.font = 'bold 54px sans-serif'; x.fillText('🏆 BESTENLISTE · TOP 10', 512, 82);
+        x.font = 'bold 40px sans-serif';
+        top.forEach((e, i) => {
+            const y = 160 + i * 58;
+            x.fillStyle = i == 0 ? '#ffd23d' : i == 1 ? '#d8d8d8' : i == 2 ? '#e0924a' : '#fff';
+            x.textAlign = 'left'; x.fillText((i + 1) + '. ' + e.n, 50, y);
+            x.textAlign = 'right'; x.fillText('$' + fmt(e.m), 974, y);
+        });
+        if (!top.length) { x.fillStyle = '#fff'; x.textAlign = 'center'; x.fillText('Noch keine Spieler', 512, 300); }
+        lbTex.needsUpdate = true;
+    }
+    function rkUpd(uid, n, m, a) { if (uid) S.lb[uid] = { n: String(n || 'Taucher').slice(0, 16), m: Math.floor(m) || 0, a: a ? 1 : 0, t: Date.now() }; }
+    function rkMerge(l) {
+        let ch = 0;
+        for (const u in (l || {})) { if (u == S.uid) continue; const e = l[u]; if (!S.lb[u] || e.t > S.lb[u].t) { S.lb[u] = e; ch = 1; } }
+        if (ch) drawLB();
+    }
+    function rkTrim() {
+        const all = Object.entries(S.lb).sort((a, b) => b[1].m - a[1].m);
+        const o = {}; all.slice(0, 80).forEach(([u, e]) => o[u] = e); S.lb = o;
+        // Admin-Einträge nie verlieren, damit sie nicht wieder auftauchen
+        return o;
+    }
+    // --- Zonen betreten / verlassen ---
+    function enterZone(z) {
+        closeM(); zone = z; clearBots();
+        Object.assign(p, { x: ZCX[z], y: 0, z: z == 1 ? 30 : 15, vy: 0 });
+        if (z == 2) { hp = hpMax(); toast('🤿 Tauchausrüstung abgelegt – viel Erfolg!'); }
+        else toast('🏗 Plot-Welt');
+        save();
+    }
+    function leaveZone() { closeM(); clearBots(); zone = 0; setW(S.w); toast('🌀 ' + WN[S.w]); }
+    let zmode = null;
+    function zClick() {
+        if (zmode == 'plotIn') return enterZone(1);
+        if (zmode == 'arIn') { if (S.money < 10000) return toast('Arena kostet $10.000'); S.money -= 10000; save(); return enterZone(2); }
+        if (zmode == 'exit') return leaveZone();
+        if (zmode == 'office') return openM('pm');
+        if (zmode == 'smith') return openM('ar');
+    }
+    // --- Kamera / Sicht je Zone ---
+    function zoneCam(sy, cy) {
+        pg.visible = zone != 2; pgT.visible = zone == 0; sword.visible = zone == 2;
+        if (zone == 0) return;
+        const bg = zone == 1 ? 0x9ad8f5 : 0x2b1a3a;
+        sc.background.set(bg); sc.fog.color.set(bg); sc.fog.density = zone == 1 ? .004 : .012;
+        if (zone == 2) {
+            cm.position.set(p.x, 1.7, p.z);
+            cm.lookAt(p.x - sy * 10, 1.7 + (.5 - pitch) * 8, p.z - cy * 10);
+        }
+    }
+    // --- Arena: Kampf ---
+    let hp = 100, bots = [], wave = 0, waveOn = false, atkCd = 0, swing = 0, hurtT = 0;
+    const hpMax = () => 100 + 10 * S.ar;
+    function clearBots() { bots.forEach(b => sc.remove(b.g)); bots = []; waveOn = false; wave = 0; }
+    function spawnWave() {
+        wave++;
+        const n = 2 + wave;
+        for (let i = 0; i < n; i++) {
+            const a = Math.random() * 6.28, g = new THREE.Group();
+            const mat = M(0xb03030);
+            const b = new THREE.Mesh(RG.b, mat), h = new THREE.Mesh(RG.h, M(0x7a2020));
+            h.position.y = .7; g.add(b, h);
+            g.position.set(ZCX[2] + Math.cos(a) * 14, .9, Math.sin(a) * 14);
+            sc.add(g);
+            bots.push({ g, mat, hp: 40 + 15 * wave, cd: 1, hit: 0 });
+        }
+        toast('⚔ Welle ' + wave);
+    }
+    function hurt(d) {
+        hp -= Math.round(d * (1 - .08 * S.ar)); hurtT = .25;
+        if (hp <= 0) { hp = hpMax(); clearBots(); Object.assign(p, { x: ZCX[2], z: 15 }); toast('💀 Besiegt! Zurück zum Start'); return true; }
+        return false;
+    }
+    function gotHit(d) { if (zone != 2) return; if (hurt(d.dmg)) lobbySend({ type: 'kill', to: d.fid }); }
+    function gotKill(d) { S.money += 3000; save(); toast('⚔ Spieler besiegt! +$3.000'); }
+    function hostFwd(d, from) {
+        const m = Object.assign({}, d, { fid: from });
+        if (d.to == LB.myId) { if (m.type == 'hit') gotHit(m); else gotKill(m); }
+        else if (LB.conns[d.to] && LB.conns[d.to].open) LB.conns[d.to].send(m);
+    }
+    function attack() {
+        if (zone != 2 || atkCd > 0) return;
+        atkCd = .45; swing = 1;
+        const fx = -Math.sin(yaw), fz = -Math.cos(yaw), dmg = 10 + 8 * S.wp;
+        let best = null, bd = 3.4;
+        const test = (x, z, ref) => { const dx = x - p.x, dz = z - p.z, d = Math.hypot(dx, dz); if (d < bd && (dx * fx + dz * fz) / (d || 1) > .35) { bd = d; best = ref; } };
+        bots.forEach(b => test(b.g.position.x, b.g.position.z, { bot: b }));
+        Object.keys(LB.rem).forEach(id => { const r = LB.rem[id]; if (r.w === 4) test(r.g.position.x, r.g.position.z, { id }); });
+        if (!best) return;
+        if (best.bot) {
+            const b = best.bot; b.hp -= dmg; b.hit = .15;
+            if (b.hp <= 0) {
+                sc.remove(b.g); bots = bots.filter(x => x != b);
+                const rw = 500 + 150 * wave; S.money += rw; toast('+$' + fmt(rw)); save();
+                if (!bots.length && waveOn) { hp = hpMax(); setTimeout(() => { if (waveOn && zone == 2) spawnWave(); }, 2000); toast('✅ Welle ' + wave + ' geschafft!'); }
+            }
+        } else lobbySend({ type: 'hit', to: best.id, dmg });
+    }
+    $('atk').addEventListener('pointerdown', e => { e.preventDefault(); attack(); });
+    cv.addEventListener('pointerdown', e => { if (e.pointerType == 'mouse' && e.button == 0 && !view) attack(); });
+    addEventListener('keydown', e => { if (e.key.toLowerCase() == 'f' && !view) attack(); });
+    // --- Menüs ---
+    const upc = l => Math.round(3000 * Math.pow(2.3, l));
+    function arR() {
+        const mk = (nm, arr, l, f) => `<div class="r"><div><b>${nm}: ${arr[l]}</b> ${l}/6<br><small>${f(l)}</small></div><button ${l >= 6 || S.money < upc(l) ? 'disabled' : ''} onclick="arUp('${nm == 'Waffe' ? 'wp' : 'ar'}')">${l >= 6 ? 'MAX' : '$' + fmt(upc(l))}</button></div>`;
+        $('mb').innerHTML = '<h3>⚒ Schmied</h3>' + mk('Waffe', WPN, S.wp, l => 'Schaden ' + (10 + 8 * l)) + mk('Rüstung', ARN, S.ar, l => 'Leben ' + (100 + 10 * l) + ' · −' + (8 * l) + '% Schaden')
+            + '<h4>⚔ Kämpfen</h4><div class="g"><button onclick="arFight()">' + (waveOn ? '⏹ Computer-Kampf beenden' : '🤖 Gegen Computer (Wellen)') + '</button></div><small>Gegen Spieler: Greife andere Spieler in der Arena an (⚔ / F / Klick). Sieg = +$3.000. Computer-Kills geben Geld.</small>';
+    }
+    function arUp(k) { const l = S[k]; if (l >= 6 || S.money < upc(l)) return; S.money -= upc(l); S[k]++; blade.material.color.setHex(SWC[S.wp]); hp = hpMax(); save(); arR(); }
+    function arFight() { if (waveOn) clearBots(); else { waveOn = true; wave = 0; spawnWave(); closeM(); } if (view) arR(); }
+    function owners() {
+        const o = {};
+        Object.values(LB.rem).forEach(r => { if (r.d && r.d.pls) r.d.pls.forEach(q => o[q[0]] = { nm: r.d.nm, m: q[1] | 0, c: q[2] | 0 }); });
+        S.plots.forEach(q => o[q.s] = { nm: S.nm, m: q.m, c: q.c, me: 1 });
+        return o;
+    }
+    const WC = 100000, WMAX = 8, PC = 1000000;
+    const rate = () => S.plots.reduce((a, q) => a + q.m * 35 + q.c * 40, 0);
+    function pmR() {
+        const o = owners();
+        let h = '<h3>🏢 Plot-Büro</h3>';
+        S.plots.forEach(q => {
+            const n = q.m + q.c;
+            h += `<div class="r" style="display:block"><b>Plot #${q.s + 1}</b> · Arbeiter ${n}/${WMAX} · $${fmt(q.m * 35 + q.c * 40)}/s<div class="g"><button ${n >= WMAX || S.money < WC ? 'disabled' : ''} onclick="plHire(${q.s},'m')">⛏ Minenarbeiter (${q.m}) $${fmt(WC)}</button><button ${n >= WMAX || S.money < WC ? 'disabled' : ''} onclick="plHire(${q.s},'c')">💻 Computerarbeiter (${q.c}) $${fmt(WC)}</button></div></div>`;
+        });
+        if (S.plots.length) h += `<p>💰 Gesamt: $${fmt(rate())}/s · Minenarbeiter ≈$35/s (finden manchmal Edelsteine), Computerarbeiter $40/s</p>`;
+        h += `<h4>🏗 ${S.plots.length ? 'Weiteren Plot kaufen' : 'Plot kaufen'} · $${fmt(PC)}</h4><div class="g">` + PS.map((q, i) => `<button ${o[i] || S.money < PC ? 'disabled' : ''} onclick="plBuy(${i})">${o[i] ? (o[i].me ? '✔ Dein Plot' : o[i].nm) : 'Plot ' + (i + 1)}</button>`).join('') + '</div><small>Arbeiter verdienen auch, wenn du woanders spielst (bis 1 h offline).</small>';
+        $('mb').innerHTML = h;
+    }
+    function plBuy(i) { if (S.money < PC || owners()[i]) return; S.money -= PC; S.plots.push({ s: i, m: 0, c: 0 }); save(); pmR(); toast('🏗 Plot #' + (i + 1) + ' gekauft!'); }
+    function plHire(i, k) { const q = S.plots.find(x => x.s == i); if (!q || q.m + q.c >= WMAX || S.money < WC) return; S.money -= WC; q[k]++; save(); pmR(); }
+    // --- Plot-Darstellung & Arbeiter ---
+    function wkMake(sl, kind, k, nm) {
+        const g = new THREE.Group();
+        const b = new THREE.Mesh(RG.b, M(kind == 'm' ? 0xcc8a2a : 0x3a7acc)), h = new THREE.Mesh(RG.h, M(0xffd2a6));
+        h.position.y = .7; g.add(b, h);
+        const t = document.createElement('canvas'); t.width = 512; t.height = 64;
+        const x = t.getContext('2d'); x.fillStyle = '#000a'; x.fillRect(0, 8, 512, 48); x.fillStyle = '#fff'; x.font = 'bold 30px sans-serif'; x.textAlign = 'center'; x.fillText('Arbeiter von ' + nm, 256, 44);
+        const sp = new THREE.Sprite(new THREE.SpriteMaterial({ map: new THREE.CanvasTexture(t), transparent: true })); sp.scale.set(4.4, .55, 1); sp.position.y = 1.7; g.add(sp);
+        const col = k % 3, row = Math.floor(k / 3);
+        const bx = kind == 'm' ? sl.sx - 4.6 + col * 1.5 : sl.sx + .6 + col * 1.5;
+        g.position.set(bx, .9, sl.sz - 1 + row * 1.5); g.userData = { kind, k, bx };
+        sc.add(g); return g;
+    }
+    function plotSync() {
+        const o = owners();
+        PS.forEach((q, i) => {
+            const e = o[i], key = e ? e.nm + '|' + e.m + '|' + e.c : '';
+            if (key === q.key) return; q.key = key;
+            if (q.sp.material.map) q.sp.material.map.dispose();
+            q.sp.material.map = remTex(e ? 'Plot ' + (i + 1) + ' · ' + e.nm : 'Plot ' + (i + 1) + ' · Frei', 0); q.sp.material.needsUpdate = true;
+            q.fl.material.color.setHex(e ? (e.me ? 0xb89a3a : 0x7a6a4a) : 0x3a6b3a);
+            [q.mine, q.hole, q.desk, q.scr].forEach(m => m.visible = !!e);
+            q.wk.forEach(w => { sc.remove(w); w.children[2].material.map.dispose(); }); q.wk = [];
+            if (e) { for (let k = 0; k < e.m; k++) q.wk.push(wkMake(q, 'm', k, e.nm)); for (let k = 0; k < e.c; k++) q.wk.push(wkMake(q, 'c', k, e.nm)); }
+        });
+    }
+    // --- Takt: Animationen / Bots / Regeneration ---
+    let zl = performance.now();
+    (function zLoop(now) {
+        requestAnimationFrame(zLoop);
+        const dt = Math.min(.1, (now - zl) / 1000); zl = now; const t = now / 1000;
+        if (zone == 1) PS.forEach(q => q.wk.forEach(w => { const u = w.userData; w.position.y = .9 + Math.abs(Math.sin(t * (u.kind == 'm' ? 6 : 2) + u.k)) * (u.kind == 'm' ? .25 : .05); w.rotation.y = u.kind == 'm' ? Math.sin(t * 3 + u.k) * .6 : 0; }));
+        if (zone == 2) {
+            atkCd -= dt; swing = Math.max(0, swing - dt * 4); hurtT -= dt;
+            sword.rotation.x = -.5 - swing * 1.3; sword.position.z = -.8 - swing * .3;
+            bots.forEach(b => {
+                const dx = p.x - b.g.position.x, dz = p.z - b.g.position.z, d = Math.hypot(dx, dz) || 1;
+                if (d > 1.7) { b.g.position.x += dx / d * (2.2 + .1 * wave) * dt; b.g.position.z += dz / d * (2.2 + .1 * wave) * dt; }
+                b.g.rotation.y = Math.atan2(dx, dz); b.cd -= dt; b.hit -= dt;
+                b.mat.emissive.setHex(b.hit > 0 ? 0xffffff : 0);
+                if (d < 2.1 && b.cd <= 0) { b.cd = 1.1; hurt(6 + 2 * wave); }
+            });
+            if (!bots.length && !waveOn) hp = Math.min(hpMax(), hp + dt * 4);
+            $('hpb').style.width = Math.max(0, 100 * hp / hpMax()) + '%';
+            $('hpb').style.background = hurtT > 0 ? '#fff' : '#e74c3c';
+            $('hpt').textContent = '❤ ' + Math.ceil(hp) + '/' + hpMax() + (waveOn ? ' · Welle ' + wave : '');
+        }
+        $('hpw').style.display = $('xh').style.display = $('atk').style.display = zone == 2 && !view ? '' : 'none';
+        if (view == 'ar' && zone != 2) closeM();
+    })(performance.now());
+    // --- 5x pro Sekunde: Nähe-Check für Portale, Büro, Schmied ---
+    setInterval(() => {
+        pPlotP.visible = zone == 0 && S.w == 2; pArenaP.visible = zone == 0 && S.w == 1;
+        let m = null;
+        if (zone == 0 && p.y > -3) m = pPlotP.visible && dist2(-18, 2) < 4 ? 'plotIn' : pArenaP.visible && dist2(18, 2) < 4 ? 'arIn' : null;
+        else if (zone == 1) m = dist2(CX1, 36) < 4 ? 'exit' : dist2(CX1, 24) < 5.5 ? 'office' : null;
+        else if (zone == 2) m = dist2(CX2 + 8, 18) < 4 ? 'exit' : dist2(CX2 - 8, 18) < 4.5 ? 'smith' : null;
+        zmode = m;
+        const b = $('zpo');
+        b.style.display = m ? '' : 'none';
+        b.textContent = { plotIn: '🏗 Plot-Welt', arIn: '🏟 Arena ($10.000)', exit: '↩ Zurück', office: '🏢 Plot-Büro', smith: '⚒ Schmied' }[m] || '';
+        if (!m && (view == 'pm' || view == 'ar')) closeM();
+        if (zone == 1) plotSync();
+    }, 200);
+    // --- 1x pro Sekunde: Einkommen der Arbeiter, Bestenliste ---
+    let rkT = 0;
+    setInterval(() => {
+        if (rate() > 0) {
+            S.money += rate(); const nm_ = S.plots.reduce((a, q) => a + q.m, 0); if (nm_ && Math.random() < .01 * nm_) { S.money += 1500; toast('💎 Ein Arbeiter hat einen Edelstein gefunden! +$1.500'); }
+        }
+        S.lastT = Date.now();
+        rkUpd(S.uid, S.nm, S.money, S.adm);
+        if (LB.host) {
+            Object.values(LB.pos).forEach(d => d.uid && rkUpd(d.uid, d.nm, d.mo, d.ad));
+            if (++rkT % 3 == 0) { rkTrim(); Object.values(LB.conns).forEach(c => c.open && c.send({ type: 'rank', lb: S.lb })); }
+        }
+        if (rkT % 3 == 0) drawLB();
+        if (rkT % 5 == 0) save();
+    }, 1000);
+    // Offline-Verdienst der Arbeiter (max. 1 Stunde)
+    if (rate() > 0 && S.lastT) {
+        const sec = Math.min(3600, Math.max(0, (Date.now() - S.lastT) / 1000));
+        if (sec > 30) { const g_ = Math.floor(sec * rate()); S.money += g_; setTimeout(() => toast('🏗 Deine Arbeiter haben $' + fmt(g_) + ' verdient'), 1500); }
+    }
+    drawLB();
+
     drawBB();
+    // Herzschlag: Clients melden sich alle 2 s; der Host wirft Spieler raus, von denen >7 s nichts kam (Tab geschlossen, Handy aus ...)
+    setInterval(() => {
+        if (LB.host) {
+            const now = Date.now();
+            let ch = 0;
+            Object.keys(LB.names).forEach(id => {
+                if (id == LB.myId) return;
+                if (now - (LB.last[id] || 0) > 7000) {
+                    try { LB.conns[id] && LB.conns[id].close(); } catch (e) { }
+                    delete LB.conns[id]; delete LB.names[id]; delete LB.pos[id]; delete LB.adm[id]; delete LB.last[id];
+                    ch = 1;
+                }
+            });
+            if (ch) hostUpdate();
+        } else if (LB.conn && LB.conn.open) LB.conn.send({ type: 'ping' });
+    }, 2000);
     setInterval(() => { if (view == 'adm') plR(); }, 1000);
     lobbyJoin();
 
