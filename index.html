@@ -192,7 +192,26 @@
         margin:6px 0;
     }
 
+    #kp {
+        position:fixed;
+        left:50%;
+        top:30%;
+        transform:translateX(-50%);
+        z-index:100;
+        background:#000d;
+        border:3px solid var(--ac);
+        color:var(--ac);
+        padding:14px 22px;
+        border-radius:18px;
+        display:none;
+        pointer-events:none;
+        text-align:center;
+        font-size:20px;
+        max-width:80%;
+    }
+
     #t {
+        z-index:90;
         position:fixed;
         left:50%;
         top:22%;
@@ -226,6 +245,8 @@
         <span class="pill">💵 $<span id="hm"></span></span>
         <span class="pill">🪙 <span id="hc"></span></span>
         <span class="pill">⬇ <span id="hd"></span></span>
+        <span class="pill" id="hadm" style="display:none;color:#ffd23d;border:1px solid #ffd23d">👑 Admin</span>
+        <span class="pill" id="hk" style="display:none">🔑 Schlüssel</span>
         <div id="o2"><div id="o2b"></div></div>
     </div>
 
@@ -255,6 +276,7 @@
         <button class="b" id="bcas" style="display:none" onclick="openM('cas')">🎰 Casino</button>
         <button class="b" id="bfi" style="display:none" onclick="openM('fish')">🎣 Angeln</button>
         <button class="b" id="bsc" style="display:none" onclick="openM('tr')">⛏ Schatzsuche</button>
+        <button class="b" id="bbd" style="display:none" onclick="openM('bb')">📌 Schwarzes Brett</button>
         <button class="b" id="bpo" style="display:none" onclick="openM('portal')">🌀 Portal</button>
         <button class="b" id="bg1" style="display:none" onclick="openM('g1')"></button>
         <button class="b" id="bg2" style="display:none" onclick="openM('g2')"></button>
@@ -262,6 +284,7 @@
 
     <!-- Toast-Meldung -->
     <div id="t"></div>
+    <div id="kp"></div>
 
     <!-- Menü-Overlay -->
     <div id="m">
@@ -289,6 +312,9 @@
     try {
         Object.assign(S, JSON.parse(localStorage.getItem('tz1') || '{}'));
     } catch (e) { }
+    if (!S.uw) S.uw = [(S.u || [0, 0, 0, 0, 0]).slice(), [0, 0, 0, 0, 0], [0, 0, 0, 0, 0]];
+    // Shop pro Welt neu (Index 0-3); Trading-Algorithmus (Index 4) bleibt global in S.u[4]
+    const lv = i => i == 4 ? S.u[4] : S.uw[S.w][i];
     const save = () => {
         if (window.noSave) return;
         try {
@@ -303,9 +329,9 @@
     const UD = ['+12 s Luft', '+8 m maximale Tiefe', 'schneller schwimmen', 'größerer Sammelradius', 'bessere Bot-Rendite'];
     const UB = [80, 120, 70, 90, 150];
     const MAXL = 6;
-    const cost = i => Math.round(UB[i] * Math.pow(2.1, S.u[i]));
-    const lim = () => 8 + 8 * S.u[1];
-    const o2max = () => (25 + 12 * S.u[0]) * (S.buff > Date.now() ? 1.5 : 1);
+    const cost = i => Math.round(UB[i] * Math.pow(2.1, lv(i)) * WM[S.w]);
+    const lim = () => 8 + 8 * lv(1);
+    const o2max = () => (25 + 12 * lv(0)) * (S.buff > Date.now() ? 1.5 : 1);
     let tt;
     function toast(s) {
         const t = $('t');
@@ -620,7 +646,7 @@
             mx /= l;
             mz /= l;
         }
-        const sp = (inP ? 3.5 : 5) + .5 * S.u[2];
+        const sp = (inP ? 3.5 : 5) + .5 * lv(2);
         if (!view) {
             p.x += mx * sp * dt;
             p.z += mz * sp * dt;
@@ -630,7 +656,7 @@
         if (inP && !view) {
             const v = (up || K[' '] ? 1 : 0) - (dn || K.shift || K.c ? 1 : 0);
             // Realistisches Sinken: ohne Eingabe sinkt man langsam, mit Eingabe wird weich beschleunigt/gebremst
-            const tv = v ? v * (2.5 + .3 * S.u[2]) : -1.3;
+            const tv = v ? v * (2.5 + .3 * lv(2)) : -1.3;
             p.vy = (p.vy || 0) + (tv - (p.vy || 0)) * Math.min(1, dt * (v ? 5 : 1.5));
             p.y = Math.min(0, Math.max(-lim(), p.y + p.vy * dt));
             if (p.y <= -lim() || p.y >= 0) p.vy = 0;
@@ -672,7 +698,7 @@
                 }
             }
         }
-        const rad = 1.3 + .5 * S.u[3];
+        const rad = 1.3 + .5 * lv(3);
         for (const c of chips) {
             c.rotation.z += dt * 2;
             if (!c.visible) {
@@ -748,6 +774,7 @@
         if (view == 'portal') portalR();
         if (view == 'g1' || view == 'g2') gR();
         if (view == 'adm') admR();
+        if (view == 'bb') bbR();
         if (view == 'tr')
             treasR();
         if (view == 'help')
@@ -756,7 +783,7 @@
             fishR();
         setTimeout(bjR);
         if (view == 'shop')
-            b.innerHTML = '<h3>🛠 Tauch-Shop</h3><small>Tiefe: ' + lim() + ' m (rote Ebene im Becken)</small>' + S.u.map((l, i) => `<div class="r"><div><b>${UN[i]}</b> ${l}/${MAXL}<br><small>${UD[i]}</small></div><button class="b" onclick="buyU(${i})">${l >= MAXL ? 'MAX' : '$' + fmt(cost(i))}</button></div>`).join('');
+            b.innerHTML = '<h3>🛠 Tauch-Shop · ' + WN[S.w] + '</h3><small>Tiefe: ' + lim() + ' m (rote Ebene im Becken) · Jede Welt hat einen neuen Shop (nur der Trading-Algorithmus bleibt)</small>' + UN.map((_, i) => { const l = lv(i); return `<div class="r"><div><b>${UN[i]}</b> ${l}/${MAXL}<br><small>${UD[i]}</small></div><button class="b" onclick="buyU(${i})">${l >= MAXL ? 'MAX' : '$' + fmt(cost(i))}</button></div>`; }).join('');
         if (view == 'cas')
             b.innerHTML = casTop() + (cg == 'bj' ? bjH() : `<div id="rn">–</div><div id="rm" style="text-align:center">Wähle eine Farbe</div><p>Einsatz: <b id="bt">${bet}</b> Chips</p><div class="g"><button onclick="bs(0)">Min</button><button onclick="bs(1)">½</button><button onclick="bs(2)">×2</button><button onclick="bs(3)">Max</button></div><div class="g"><button class="red" onclick="spin('r')">Rot ×2</button><button class="blk" onclick="spin('k')">Schwarz ×2</button><button class="grn" onclick="spin('g')">0 ×36</button></div><small id="hs">${hist.join(' ')}</small>`);
         if (view == 'mk') {
@@ -765,12 +792,12 @@
         }
     }
     function buyU(i) {
-        if (S.u[i] >= MAXL)
+        if (lv(i) >= MAXL)
             return;
         if (S.money < cost(i))
             return toast('Zu wenig Geld');
         S.money -= cost(i);
-        S.u[i]++;
+        if (i == 4) S.u[4]++; else S.uw[S.w][i]++;
         setBar();
         save();
         render();
@@ -945,7 +972,7 @@
     function interact() {
         if (view)
             return;
-        for (const [i, v] of [['bcas', 'cas'], ['bfi', 'fish'], ['bsc', 'tr'], ['bpo', 'portal'], ['bg1', 'g1'], ['bg2', 'g2']])
+        for (const [i, v] of [['bcas', 'cas'], ['bfi', 'fish'], ['bsc', 'tr'], ['bbd', 'bb'], ['bpo', 'portal'], ['bg1', 'g1'], ['bg2', 'g2']])
             if ($(i).style.display == '')
                 return openM(v);
     }
@@ -1001,6 +1028,14 @@
     // ============================================================
     const FISH = [['Sardine', '🐟', 60, 4, 1200], ['Forelle', '🐠', 25, 10, 950], ['Karpfen', '🐡', 10, 25, 750], ['Hecht', '🦈', 4, 60, 580], ['Goldener Koi', '🎏', .9, 200, 420], ['Tiefsee-Krake', '🐙', .1, 1000, 350]];
     const QS = [['Sardine', 5, 40], ['Forelle', 3, 80], ['Karpfen', 2, 150], ['Hecht', 1, 250], ['Goldener Koi', 1, 600]];
+    const FSUM = FISH.reduce((a, f) => a + f[2], 0);
+    function rollFish() {
+        // echter Zufall bei jedem Biss, gewichtet nach den angezeigten Wahrscheinlichkeiten
+        let r = Math.random() * FSUM;
+        for (const f of FISH) { r -= f[2]; if (r < 0) return f; }
+        return FISH[0];
+    }
+    const odds = w => { const x = FSUM / w; return '1 zu ' + (x >= 10 ? Math.round(x).toLocaleString('de-DE') : x.toFixed(1).replace('.', ',')); };
     let fst = 'idle';
     let ft;
     let fcur;
@@ -1011,8 +1046,7 @@
             fmsg = 'Köder im Wasser … warte auf den Biss';
             fishR();
             ft = setTimeout(() => {
-                let r = Math.random() * 100;
-                fcur = FISH.find(f => (r -= f[2]) < 0) || FISH[0];
+                fcur = rollFish();
                 fst = 'bite';
                 fmsg = '❗ BISS!';
                 fishR();
@@ -1034,13 +1068,15 @@
         else {
             clearTimeout(ft);
             fst = 'idle';
+            let gotKey = 0;
             S.fish[fcur[0]] = (S.fish[fcur[0]] || 0) + 1;
             S.seen[fcur[0]] = 1;
             if (S.w == 0 && !S.unl[1] && !S.k[0] && Math.random() < 1 / 25) {
                 S.k[0] = 1;
-                toast('🔑 Schlüssel gefunden! Bring ihn zum Portal');
+                keyPop('Schlüssel gefunden!<br><small>Bring ihn zum Portal ganz unten im Becken</small>');
+                gotKey = 1;
             }
-            fmsg = 'Gefangen: ' + fcur[1] + ' ' + fcur[0] + '!';
+            fmsg = 'Gefangen: ' + fcur[1] + ' ' + fcur[0] + '!' + (gotKey ? '<br>🔑 Du hast einen Schlüssel bekommen!' : '');
             save();
             fishR();
         }
@@ -1080,11 +1116,18 @@
         save();
         fishR();
     }
+    function keyPop(t) {
+        const e = $('kp');
+        e.innerHTML = '<div style="font-size:60px">🔑</div><b>' + t + '</b>';
+        e.style.display = 'block';
+        clearTimeout(keyPop.t);
+        keyPop.t = setTimeout(() => e.style.display = 'none', 4500);
+    }
     function fishR() {
         if (view != 'fish')
             return;
         const q = QS[S.q];
-        $('mb').innerHTML = `<h3>🎣 Angelhaus</h3><div style="text-align:center;font-size:20px;min-height:56px;margin:6px 0">${fmsg || 'Wirf die Angel aus und zieh, sobald es anbeißt!'}</div><div class="g"><button class="b" style="font-size:20px;padding:18px" onclick="fAct()">${fst == 'idle' ? 'Angel auswerfen' : fst == 'wait' ? 'Warten …' : 'JETZT ZIEHEN!'}</button></div><h4>📖 Sammelbuch</h4>${FISH.map(f => `<div class="r"><span>${S.seen[f[0]] ? f[1] + ' ' + f[0] : '❓ ???'}</span><small>${f[2] < 1 ? 'legendär' : f[2] < 5 ? 'selten' : 'häufig'} · ${S.seen[f[0]] ? 'im Beutel: ' + (S.fish[f[0]] || 0) + ' · $' + f[3] : 'unentdeckt'}</small></div>`).join('')}<div class="g"><button onclick="fSell()">Alle verkaufen</button><button onclick="fCook()">Kochen (Buff)</button></div><h4>📜 Quest</h4>${q ? `<div class="r"><span>${q[1]}× ${q[0]} abgeben<br><small>Belohnung $${q[2]}</small></span><button class="b" onclick="fQ()">Abgeben</button></div>` : '<small>Alle Quests erledigt!</small>'}`;
+        $('mb').innerHTML = `<h3>🎣 Angelhaus</h3><div style="text-align:center;font-size:20px;min-height:56px;margin:6px 0">${fmsg || 'Wirf die Angel aus und zieh, sobald es anbeißt!'}</div><div class="g"><button class="b" style="font-size:20px;padding:18px" onclick="fAct()">${fst == 'idle' ? 'Angel auswerfen' : fst == 'wait' ? 'Warten …' : 'JETZT ZIEHEN!'}</button></div><h4>📖 Sammelbuch</h4>${FISH.map(f => `<div class="r"><span>${S.seen[f[0]] ? f[1] + ' ' + f[0] : '❓ ???'}</span><small>${odds(f[2])} · ${f[2] < 1 ? 'legendär' : f[2] < 5 ? 'selten' : 'häufig'} · ${S.seen[f[0]] ? 'im Beutel: ' + (S.fish[f[0]] || 0) + ' · $' + f[3] : 'unentdeckt'}</small></div>`).join('')}<div class="g"><button onclick="fSell()">Alle verkaufen</button><button onclick="fCook()">Kochen (Buff)</button></div><h4>📜 Quest</h4>${q ? `<div class="r"><span>${q[1]}× ${q[0]} abgeben<br><small>Belohnung $${q[2]}</small></span><button class="b" onclick="fQ()">Abgeben</button></div>` : '<small>Alle Quests erledigt!</small>'}`;
     }
 
     // ============================================================
@@ -1172,8 +1215,8 @@
     // ============================================================
     // 15. ERWEITERUNG: Welten, Portal, Minispiele, Adminpanel
     // ============================================================
-    const ADMIN_PW = 'admin123'; // <- hier Passwort ändern
-    const ADM = { on: 0, frz: 0 };
+    const ADMIN_PW = 'admin13'; // Admin-Code (Anmeldung + Adminpanel)
+    const ADM = { on: S.adm ? 1 : 0, frz: 0 };
     addEventListener('keydown', e => { if (e.target.tagName == 'INPUT') e.stopImmediatePropagation(); }, true);
     addEventListener('keyup', e => { if (e.target.tagName == 'INPUT') e.stopImmediatePropagation(); }, true);
     const PORTAL_Y = -54;
@@ -1201,9 +1244,32 @@
         sc.add(g);
         return { g, s };
     });
-    const portal = new THREE.Mesh(new THREE.TorusGeometry(2.5, .4, 12, 32), new THREE.MeshBasicMaterial({ color: 0xffffff }));
-    portal.position.y = PORTAL_Y;
-    sc.add(portal);
+    function mkPortal(x, y, z, col, label) {
+        const g = new THREE.Group();
+        g.position.set(x, y, z);
+        g.add(new THREE.Mesh(new THREE.TorusGeometry(2.5, .4, 12, 32), new THREE.MeshBasicMaterial({ color: col })));
+        const d = new THREE.Mesh(new THREE.CircleGeometry(2.4, 32), new THREE.MeshBasicMaterial({ color: col, transparent: true, opacity: .3, side: THREE.DoubleSide }));
+        g.add(d);
+        const sp = new THREE.Sprite(new THREE.SpriteMaterial({ map: sg(label) }));
+        sp.scale.set(5, 1.25, 1);
+        sp.position.y = 3.8;
+        g.add(sp);
+        sc.add(g);
+        return g;
+    }
+    // Schlüssel-Portal ganz unten im Becken (nur solange das nächste Portal noch versiegelt ist)
+    const pBot = mkPortal(0, PORTAL_Y, 0, 0xffffff, '🔑 Portal öffnen');
+    // Plattform-Portale: vor / zurück
+    const pFwd = mkPortal(6, 3, 14, 0xffd23d, '🌀 Nächste Welt');
+    const pBack = mkPortal(-6, 3, 14, 0x4da6ff, '↩ Zurück');
+    const portal = pBot;
+    function portalVis() {
+        pBot.visible = S.w < 2 && !S.unl[S.w + 1];
+        pFwd.visible = S.w < 2 && !!S.unl[S.w + 1];
+        pBack.visible = S.w > 0;
+        pFwd.children[0].material.color.setHex(TC[Math.min(2, S.w + 1)][3]);
+        pFwd.children[1].material.color.setHex(TC[Math.min(2, S.w + 1)][3]);
+    }
     function setW(n) {
         S.w = n;
         TH.uw = [0x0b4f7c, 0x4a1670, 0x6a1a1a][n];
@@ -1211,30 +1277,43 @@
         walls.material.color.setHex([0x2a8fbd, 0x8a3fbd, 0xbd4a2a][n]);
         fl.material.color.setHex([0x1b5a80, 0x4a2a80, 0x802a1a][n]);
         wt.material.color.setHex([0x2aa3d8, 0xb06af0, 0xf08a3a][n]);
-        portal.material.color.setHex(TC[Math.min(2, n + 1)][3]);
+        pBot.children[0].material.color.setHex(TC[Math.min(2, n + 1)][3]);
+        portalVis(); setBar();
         hs.forEach((h, i) => { h.g.visible = n > 0; if (n) h.s.material.map = sg(GN[n][i]); });
-        Object.assign(p, { x: 0, y: 0, z: 0, o2: o2max() });
+        Object.assign(p, { x: 0, y: 0, z: 10, vy: 0, o2: o2max() });
         chips.forEach(c => place(c));
         save();
     }
     const go = n => { closeM(); setW(n); toast('🌀 ' + WN[n]); };
+    let pmode = 'key';
     function portalR() {
         const n = S.w, nx = n + 1;
         let h = '<h3>🌀 Portal</h3>';
-        if (n < 2)
-            h += S.unl[nx] ? `<div class="g"><button class="b" onclick="go(${nx})">→ ${WN[nx]} (Chips ×${WM[nx]})</button></div>`
-                : S.k[n] ? `<p>🔑 Du hast einen Schlüssel!</p><div class="g"><button class="b" onclick="S.k[${n}]=0;S.unl[${nx}]=1;save();render()">Portal öffnen</button></div>`
-                    : `<p>Das Portal ist versiegelt. Du brauchst einen 🔑 Schlüssel (${n ? 'Reaktion-Minispiel' : 'Angeln'}, Chance 1:25).</p>`;
-        else h += '<p>Das ist die letzte Welt.</p>';
-        if (n > 0) h += `<div class="g"><button onclick="go(${n - 1})">← ${WN[n - 1]}</button></div>`;
+        if (pmode == 'back')
+            h += `<div class="g"><button class="b" onclick="go(${n - 1})">← ${WN[n - 1]}</button></div>`;
+        else if (pmode == 'fwd')
+            h += `<div class="g"><button class="b" onclick="go(${nx})">→ ${WN[nx]} (Chips ×${WM[nx]})</button></div>`;
+        else
+            h += S.unl[nx] ? '<p>✅ Freigeschaltet! Das Portal steht jetzt oben auf der Plattform.</p>'
+                : S.k[n] ? `<p>🔑 Du hast einen Schlüssel!</p><div class="g"><button class="b" onclick="S.k[${n}]=0;S.unl[${nx}]=1;save();portalVis();keyPop('Portal freigeschaltet!<br><small>Es steht jetzt oben auf der Plattform</small>');render()">Portal öffnen</button></div>`
+                    : `<p>Das Portal ist versiegelt. Du brauchst einen 🔑 Schlüssel (${n ? 'Reaktion-Minispiel' : 'Angeln'}, Chance 1 zu 25).</p>`;
         $('mb').innerHTML = h;
     }
     const _om = openM;
     openM = function (v) { gst = 0; gt0++; _om(v); };
     setInterval(() => {
-        const np = Math.hypot(p.x, p.y - PORTAL_Y, p.z) < 4;
-        $('bpo').style.display = np ? '' : 'none';
-        if (!np && view == 'portal') closeM();
+        const nb = Math.hypot(p.x, p.z - 19) < 5.5 && p.y > -3;
+        $('bbd').style.display = nb ? '' : 'none';
+        if (!nb && view == 'bb') closeM();
+        $('hadm').style.display = S.adm ? '' : 'none';
+        portalVis();
+        const pm = pBot.visible && Math.hypot(p.x, p.y - PORTAL_Y, p.z) < 4 ? 'key'
+            : pFwd.visible && p.y > -3 && Math.hypot(p.x - 6, p.z - 14) < 4 ? 'fwd'
+            : pBack.visible && p.y > -3 && Math.hypot(p.x + 6, p.z - 14) < 4 ? 'back' : null;
+        $('bpo').style.display = pm ? '' : 'none';
+        if (pm) { if (pm != pmode && view == 'portal') { pmode = pm; render(); } pmode = pm; $('bpo').textContent = pm == 'key' ? '🔑 Portal' : pm == 'fwd' ? '🌀 Nächste Welt' : '↩ Zurück'; }
+        if (!pm && view == 'portal') closeM();
+        $('hk').style.display = S.k[S.w] ? '' : 'none';
         HOUSES.forEach(([x, z, id]) => {
             const near = S.w > 0 && Math.hypot(p.x - x, p.z - z) < 5;
             $('b' + id).style.display = near ? '' : 'none';
@@ -1254,7 +1333,7 @@
         const k = gk();
         let h = `<h3>${GN[S.w][view == 'g1' ? 0 : 1]}</h3><div style="text-align:center;font-size:30px;min-height:48px;margin:6px 0">${gm}</div>`;
         if (k == 'slots') h += bt() + '<div class="g"><button class="b" onclick="slots()">Drehen</button></div><small>3 gleiche ×20 · 2 gleiche = Einsatz zurück</small>';
-        if (k == 'react') h += bt() + `<div class="g"><button class="${gst == 2 ? 'grn' : 'b'}" style="padding:22px" onclick="react()">${['Start', 'Warte …', 'JETZT!'][gst]}</button></div><small>Schneller = mehr Gewinn (bis ×3) · 🔑 Schlüssel 1:25 pro Runde</small>`;
+        if (k == 'react') h += bt() + `<div class="g"><button class="${gst == 2 ? 'grn' : 'b'}" style="padding:22px" onclick="react()">${['Start', 'Warte …', 'JETZT!'][gst]}</button></div><small>Schneller = mehr Gewinn (bis ×3) · 🔑 Schlüssel 1 zu 25 pro Runde</small>`;
         if (k == 'plinko') h += bt() + '<div class="g"><button class="b" onclick="plinko()">Kugel fallen lassen</button></div><small>Multiplikatoren außen ×9 ·· Mitte ×0,4</small>';
         if (k == 'mem') h += bt() + (mem ? '<div style="display:grid;grid-template-columns:repeat(4,1fr);gap:6px">' + mem.c.map((v, i) => `<button style="font-size:24px;padding:12px 0" onclick="flip(${i})">${mem.o[i] || mem.d[i] ? v : '❔'}</button>`).join('') + '</div><p>Fehler: ' + mem.m + '/4</p>' : '') + '<div class="g"><button class="b" onclick="memNew()">Neues Spiel</button></div><small>Alle 6 Paare mit max. 4 Fehlern: ×3</small>';
         $('mb').innerHTML = h;
@@ -1277,7 +1356,7 @@
             const t = performance.now() - gt0, m = t < 350 ? 3 : t < 550 ? 2 : t < 800 ? 1.2 : 0;
             pay(m); gst = 0;
             gm = Math.round(t) + ' ms → ' + (m ? '×' + m : 'Verloren');
-            if (S.w == 1 && !S.unl[2] && !S.k[1] && Math.random() < 1 / 25) { S.k[1] = 1; toast('🔑 Schlüssel für ' + WN[2] + '!'); save(); }
+            if (S.w == 1 && !S.unl[2] && !S.k[1] && Math.random() < 1 / 25) { S.k[1] = 1; keyPop('Schlüssel für ' + WN[2] + ' bekommen!<br><small>Bring ihn zum Portal ganz unten im Becken</small>'); gm += '<br>🔑 Schlüssel bekommen!'; save(); }
             gR();
         }
     }
@@ -1310,11 +1389,57 @@
         }
     }
 
+    // ---- Schwarzes Brett (alle lesen, nur Admins schreiben) ----
+    {
+        const g = new THREE.Group();
+        g.position.set(0, 0, 19);
+        const bo = new THREE.Mesh(new THREE.BoxGeometry(7, 3.4, .3), M(0x111111));
+        bo.position.y = 3.4;
+        const fr = new THREE.Mesh(new THREE.BoxGeometry(7.4, 3.8, .2), M(0x6b4a2a));
+        fr.position.set(0, 3.4, -.1);
+        const p1 = new THREE.Mesh(new THREE.BoxGeometry(.3, 3.4, .3), M(0x6b4a2a));
+        p1.position.set(-3, 1.7, 0);
+        const p2 = p1.clone();
+        p2.position.x = 3;
+        const sp = new THREE.Sprite(new THREE.SpriteMaterial({ map: sg('📌 SCHWARZES BRETT') }));
+        sp.scale.set(6, 1.5, 1);
+        sp.position.y = 6;
+        g.add(fr, bo, p1, p2, sp);
+        sc.add(g);
+    }
+    const esc = t => String(t).replace(/&/g, '&amp;').replace(/</g, '&lt;');
+    function bbR() {
+        const old = $('bbt') ? $('bbt').value : '';
+        const list = LB.board || [];
+        let h = '<h3>📌 Schwarzes Brett</h3>' + (list.length ? list.map(x => `<div class="r"><div><b style="color:#ffd23d">👑 ${esc(x.by)}</b> <small>${new Date(x.ts).toLocaleString('de-DE', { day: '2-digit', month: '2-digit', hour: '2-digit', minute: '2-digit' })}</small><br>${esc(x.t)}</div></div>`).join('') : '<small>Noch keine Nachrichten.</small>');
+        if (S.adm) h += '<input id="bbt" maxlength="140" placeholder="Nachricht (max. 140 Zeichen)" style="width:100%;box-sizing:border-box;padding:10px;margin:10px 0 6px"><div class="g"><button class="b" onclick="bbPost()">Anpinnen</button><button class="red" onclick="bbClear()">Alles löschen</button></div>';
+        else h += '<p><small>🔒 Nur Admins dürfen auf das Schwarze Brett schreiben.</small></p>';
+        $('mb').innerHTML = h;
+        if ($('bbt')) $('bbt').value = old;
+    }
+    function bbPost() {
+        if (!S.adm) return toast('Nur Admins dürfen schreiben');
+        const t = $('bbt').value.trim().slice(0, 140);
+        if (!t) return toast('Nachricht eingeben');
+        $('bbt').value = '';
+        lobbySend({ type: 'bpost', t, by: S.nm });
+        toast('Angepinnt 📌');
+    }
+    function bbClear() { if (S.adm) lobbySend({ type: 'bclear' }); }
+    function hostBoard(d, from) {
+        if (!(from == LB.myId ? S.adm : LB.adm[from])) return;
+        if (d.type == 'bclear') LB.board = [];
+        else LB.board = [{ t: String(d.t || '').slice(0, 140), by: String(d.by || '').slice(0, 16), ts: Date.now() }].concat(LB.board).slice(0, 10);
+        boardGot(LB.board);
+        Object.values(LB.conns).forEach(c => c.open && c.send({ type: 'board', list: LB.board }));
+    }
+    function boardGot(l) { LB.board = l || []; S.bd = LB.board; save(); if (view == 'bb') bbR(); }
+
     // ---- Adminpanel ----
     function admR() {
         let h = '<h3>🔧 Adminpanel</h3>';
         const inp = 'style="width:100%;box-sizing:border-box;padding:10px;margin:6px 0"';
-        if (!ADM.on) h += `<input id="pw" type="password" placeholder="Passwort" ${inp}><div class="g"><button class="b" onclick="if($('pw').value==ADMIN_PW){ADM.on=1;render()}else toast('Falsches Passwort')">Anmelden</button></div>`;
+        if (!ADM.on) h += `<input id="pw" type="password" placeholder="Passwort" ${inp}><div class="g"><button class="b" onclick="if($('pw').value==ADMIN_PW){ADM.on=1;S.adm=1;tagUpd();lobbyHello();save();render()}else toast('Falsches Passwort')">Anmelden</button></div>`;
         else h += `<h4>🎁 Verschenken</h4><div id="plist"></div><small>Zahl eingeben (negativ = abziehen)</small><input id="av" type="number" value="1000" ${inp}><div class="g"><button onclick="adm('c')">+ Chips</button><button onclick="adm('m')">+ Geld</button></div><h4>📈 Kurs (jetzt ${price.toFixed(2)})</h4><div class="g"><button onclick="adm('p')">Kurs setzen</button><button onclick="adm('x')">×2</button><button onclick="adm('h')">÷2</button></div><div class="g"><button onclick="ADM.frz^=1;render()">${ADM.frz ? '🔒 Kurs fixiert (tippen zum Lösen)' : 'Kurs fixieren'}</button></div><h4>🌍 Welten</h4><div class="g"><button onclick="S.unl=[1,1,1];save();toast('Alle Welten offen')">Alle freischalten</button></div><div class="g"><button class="red" onclick="resetAll()">⚠ Alles zurücksetzen</button></div>`;
         $('mb').innerHTML = h;
         plR();
@@ -1358,7 +1483,7 @@
         k.width = 256; k.height = 64;
         const x = k.getContext('2d');
         x.fillStyle = '#000a'; x.fillRect(0, 8, 256, 48);
-        x.fillStyle = '#fff'; x.font = 'bold 32px sans-serif'; x.textAlign = 'center';
+        x.fillStyle = S.adm ? '#ffd23d' : '#fff'; x.font = 'bold 32px sans-serif'; x.textAlign = 'center';
         x.fillText(S.nm, 128, 44);
         tag.material.map = new THREE.CanvasTexture(k);
         tag.material.needsUpdate = true;
@@ -1380,16 +1505,22 @@
     const sw = (k, a) => a.map(v => `<button onclick="cset('${k}',${v})" style="background:${hx(v)};width:36px;height:36px;border-radius:50%;border:2px solid #fff;padding:0"></button>`).join(' ');
     function cset(k, v) { S.cs[k] = v; cApply(); save(); }
     function cuR() {
-        $('mb').innerHTML = `<h3>🤿 Dein Taucher</h3><small>Name (max. 16 Zeichen)</small><input id="pn" maxlength="16" value="${S.nm.replace(/"/g, '')}" placeholder="Spielername" style="width:100%;box-sizing:border-box;padding:10px;margin:6px 0 10px"><p>Anzug<br>${sw('b', CC)}</p><p>Haut<br>${sw('h', SK)}</p><p>Sauerstofftank<br>${sw('t', TKC)}</p><p>Kopfschmuck<br>${HATS.map((n, i) => `<button onclick="cset('hat',${i})">${n}</button>`).join(' ')}</p><div class="g"><button class="b" onclick="cOk()">Los geht's!</button></div>`;
+        $('mb').innerHTML = `<h3>🤿 Dein Taucher</h3><small>Name (max. 16 Zeichen)</small><input id="pn" maxlength="16" value="${S.nm.replace(/"/g, '')}" placeholder="Spielername" style="width:100%;box-sizing:border-box;padding:10px;margin:6px 0 10px"><p>Anzug<br>${sw('b', CC)}</p><p>Haut<br>${sw('h', SK)}</p><p>Sauerstofftank<br>${sw('t', TKC)}</p><p>Kopfschmuck<br>${HATS.map((n, i) => `<button onclick="cset('hat',${i})">${n}</button>`).join(' ')}</p><label style=\"display:block;margin:8px 0\"><input type=\"checkbox\" id=\"isad\" ${S.adm ? 'checked' : ''} onchange=\"$('adc').style.display=this.checked&&!S.adm?'block':'none'\"> Ich bin Admin</label><input id=\"adc\" type=\"password\" placeholder=\"Admin-Code\" style=\"display:none;width:100%;box-sizing:border-box;padding:10px;margin:0 0 10px\"><div class=\"g\"><button class=\"b\" onclick=\"cOk()\">Los geht's!</button></div>`;
     }
     function cOk() {
         const n = $('pn').value.trim().slice(0, 16);
         if (!n) return toast('Bitte einen Namen eingeben');
+        const wantAd = $('isad') && $('isad').checked;
+        if (wantAd && !S.adm) {
+            if ($('adc').value != ADMIN_PW) return toast('Falscher Admin-Code');
+            S.adm = 1; ADM.on = 1;
+        } else if (!wantAd && S.adm) { S.adm = 0; ADM.on = 0; }
         S.nm = n; tagUpd(); save(); lobbyHello(); closeM(); toast('Willkommen, ' + n + '!');
     }
     const _cm = closeM;
     closeM = function () { if (view == 'cust' && !S.nm) return; _cm(); };
     cApply(); tagUpd();
+    if (S.adm) ADM.on = 1;
     if (!S.nm) openM('cust');
     setW(S.w);
 
@@ -1398,13 +1529,13 @@
     // Der erste Spieler wird automatisch "Host" und verteilt die Liste.
     // ============================================================
     const LOBBY_ID = 'tiefsee-zocker-lobby-v1'; // <- hier eine eigene, einzigartige ID eintragen!
-    const LB = { peer: null, host: false, conn: null, conns: {}, names: {}, list: [], myId: null };
+    const LB = { board: S.bd || [], adm: {}, peer: null, host: false, conn: null, conns: {}, names: {}, list: [], myId: null };
     ADM.to = null; // Geschenk-Empfänger (null = du selbst)
 
     function lobbyJoin() {
         if (typeof Peer == 'undefined') return;
         if (LB.peer) { try { LB.peer.destroy(); } catch (e) { } }
-        LB.host = false; LB.conns = {}; LB.names = {}; LB.pos = {};
+        LB.host = false; LB.conns = {}; LB.names = {}; LB.pos = {}; LB.adm = {};
         const p = LB.peer = new Peer(LOBBY_ID);
         p.on('open', id => { LB.host = true; LB.myId = id; LB.names[id] = S.nm; hostUpdate(); hostListen(p); });
         p.on('error', e => { if (e.type == 'unavailable-id') lobbyClient(); });
@@ -1412,11 +1543,16 @@
     }
     function hostListen(p) {
         p.on('connection', c => {
-            c.on('open', () => { LB.conns[c.peer] = c; });
+            LB.conns[c.peer] = c; // sofort registrieren (sonst bekommt der Mitspieler nie Daten/Geschenke)
+            const hi = () => { LB.conns[c.peer] = c; if (c.open) { c.send({ type: 'players', list: LB.list }); c.send({ type: 'board', list: LB.board }); } };
+            if (c.open) hi();
+            c.on('open', hi);
+            c.on('error', () => { });
             c.on('data', d => {
-                if (d.type == 'hello') { LB.names[c.peer] = String(d.name || '').slice(0, 16); hostUpdate(); }
+                if (d.type == 'hello') { LB.names[c.peer] = String(d.name || '').slice(0, 16); LB.adm[c.peer] = d.ad ? 1 : 0; hostUpdate(); }
+                if (d.type == 'bpost' || d.type == 'bclear') hostBoard(d, c.peer);
                 if (d.type == 'gift') hostRoute(d, c.peer);
-                if (d.type == 'pos') { d.ts = Date.now(); LB.pos[c.peer] = d; }
+                if (d.type == 'pos') { LB.adm[c.peer] = d.ad ? 1 : 0; d.ts = Date.now(); LB.pos[c.peer] = d; }
             });
             c.on('close', () => { delete LB.conns[c.peer]; delete LB.names[c.peer]; delete LB.pos[c.peer]; hostUpdate(); });
         });
@@ -1427,6 +1563,7 @@
         plR();
     }
     function hostRoute(d, from) {
+        if (!['m', 'c'].includes(d.kind) || !isFinite(Number(d.amt))) return;
         const m = { type: 'gift', kind: d.kind, amt: d.amt, from: LB.names[from] || 'Jemand' };
         if (d.to == LB.myId) giftGot(m);
         else if (LB.conns[d.to] && LB.conns[d.to].open) LB.conns[d.to].send(m);
@@ -1436,23 +1573,25 @@
         const p = LB.peer = new Peer();
         p.on('open', id => {
             LB.myId = id;
-            const c = LB.conn = p.connect(LOBBY_ID);
+            const c = LB.conn = p.connect(LOBBY_ID, { reliable: true });
             c.on('open', lobbyHello);
+            c.on('error', () => { });
             c.on('data', d => {
                 if (d.type == 'players') { LB.list = d.list; plR(); }
                 if (d.type == 'gift') giftGot(d);
                 if (d.type == 'snap') remUpdate(d.s);
+                if (d.type == 'board') boardGot(d.list);
             });
             c.on('close', () => setTimeout(lobbyJoin, 1000 + Math.random() * 2000));
         });
-        p.on('error', e => { if (e.type == 'peer-unavailable' || e.type == 'network') setTimeout(lobbyJoin, 1500 + Math.random() * 2000); });
+        p.on('error', e => { setTimeout(lobbyJoin, 1500 + Math.random() * 2000); });
     }
     function lobbyHello() {
-        if (LB.host) { LB.names[LB.myId] = S.nm; hostUpdate(); }
-        else if (LB.conn && LB.conn.open) LB.conn.send({ type: 'hello', name: S.nm });
+        if (LB.host) { LB.names[LB.myId] = S.nm; LB.adm[LB.myId] = S.adm ? 1 : 0; hostUpdate(); }
+        else if (LB.conn && LB.conn.open) LB.conn.send({ type: 'hello', name: S.nm, ad: S.adm ? 1 : 0 });
     }
     function lobbySend(d) {
-        if (LB.host) hostRoute(d, LB.myId);
+        if (LB.host) { if (d.type == 'bpost' || d.type == 'bclear') hostBoard(d, LB.myId); else hostRoute(d, LB.myId); }
         else if (LB.conn && LB.conn.open) LB.conn.send(d);
     }
     function giftGot(d) {
@@ -1478,12 +1617,12 @@
     LB.pos = {}; LB.rem = {};
     const RG = { b: new THREE.CylinderGeometry(.35, .35, 1, 12), h: new THREE.SphereGeometry(.3, 12, 12), t: new THREE.CylinderGeometry(.18, .18, .8, 10) };
     const HG = [null, new THREE.ConeGeometry(.3, .5, 12), new THREE.CylinderGeometry(.28, .2, .3, 8), new THREE.SphereGeometry(.36, 12, 12, 0, Math.PI * 2, 0, Math.PI / 2)];
-    function remTex(name) {
+    function remTex(name, ad) {
         const k = document.createElement('canvas');
         k.width = 256; k.height = 64;
         const x = k.getContext('2d');
         x.fillStyle = '#000a'; x.fillRect(0, 8, 256, 48);
-        x.fillStyle = '#fff'; x.font = 'bold 32px sans-serif'; x.textAlign = 'center';
+        x.fillStyle = ad ? '#ffd23d' : '#fff'; x.font = 'bold 32px sans-serif'; x.textAlign = 'center';
         x.fillText(name, 128, 44);
         return new THREE.CanvasTexture(k);
     }
@@ -1501,10 +1640,11 @@
         (list || []).forEach(d => {
             if (d.id == LB.myId) return;
             const r = LB.rem[d.id] || remMake(d.id), c = d.cs || {};
-            if (d.nm !== r.nm) {
-                r.nm = d.nm;
+            const nk = d.nm + '|' + (d.ad ? 1 : 0);
+            if (nk !== r.nk) {
+                r.nk = nk; r.nm = d.nm;
                 if (r.tg.material.map) r.tg.material.map.dispose();
-                r.tg.material.map = remTex(String(d.nm || 'Taucher').slice(0, 16));
+                r.tg.material.map = remTex(String(d.nm || 'Taucher').slice(0, 16), d.ad);
                 r.tg.material.needsUpdate = true;
             }
             r.b.material.color.setHex(c.b || 0xff7a1a);
@@ -1528,10 +1668,10 @@
     // 10x pro Sekunde: Position senden (Host verteilt an alle)
     setInterval(() => {
         if (!S.nm || !LB.myId) return;
-        const m = { x: +pg.position.x.toFixed(2), y: +pg.position.y.toFixed(2), z: +pg.position.z.toFixed(2), r: +pg.rotation.y.toFixed(2), w: S.w, nm: S.nm, cs: S.cs };
+        const m = { x: +pg.position.x.toFixed(2), y: +pg.position.y.toFixed(2), z: +pg.position.z.toFixed(2), r: +pg.rotation.y.toFixed(2), w: S.w, nm: S.nm, ad: S.adm ? 1 : 0, cs: S.cs };
         if (LB.host) {
             const now = Date.now();
-            Object.keys(LB.pos).forEach(id => { if (now - LB.pos[id].ts > 5000) delete LB.pos[id]; });
+            Object.keys(LB.pos).forEach(id => { if (now - LB.pos[id].ts > 10000) delete LB.pos[id]; });
             const snap = Object.keys(LB.pos).map(id => Object.assign({ id }, LB.pos[id]));
             snap.push(Object.assign({ id: LB.myId }, m));
             Object.values(LB.conns).forEach(c => c.open && c.send({ type: 'snap', s: snap }));
@@ -1546,7 +1686,7 @@
         rl = now;
         Object.keys(LB.rem).forEach(id => {
             const r = LB.rem[id];
-            if (now - r.seen > 4000) { sc.remove(r.g); if (r.tg.material.map) r.tg.material.map.dispose(); delete LB.rem[id]; return; }
+            if (now - r.seen > 10000) { sc.remove(r.g); if (r.tg.material.map) r.tg.material.map.dispose(); delete LB.rem[id]; return; }
             r.g.visible = r.w === S.w;
             r.g.position.x += (r.tx - r.g.position.x) * k;
             r.g.position.y += (r.ty - r.g.position.y) * k;
@@ -1556,6 +1696,7 @@
         });
     })(performance.now());
 
+    setInterval(() => { if (view == 'adm') plR(); }, 1000);
     lobbyJoin();
 
     </script>
